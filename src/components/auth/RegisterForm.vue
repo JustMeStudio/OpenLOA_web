@@ -1,10 +1,5 @@
 <template>
   <div>
-    <div class="register-type-label">
-      <span class="register-type-icon">✉</span>
-      {{ t('common.emailRegister') }}
-    </div>
-
     <el-form :model="registerForm" :rules="registerRules" ref="registerFormRef" label-position="top">
       <el-form-item :label="t('common.email')" prop="email">
         <el-input
@@ -233,22 +228,5 @@ const handleRegister = async () => {
 .verify-code-wrapper {
   display: flex;
   width: 100%;
-}
-
-.register-type-label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 20px;
-  padding: 8px 0;
-  font-size: 14px;
-  color: #909399;
-  border-bottom: 1px solid #f0f0f0;
-
-  .register-type-icon {
-    font-size: 15px;
-    opacity: 0.7;
-  }
 }
 </style>

@@ -17,7 +17,7 @@ git init
 git add .
 git commit -m "最新版本"
 git branch -M master
-git remote set-url origin git@github.com:DeanFan1994/OpenLOA-web.git
+git remote set-url origin <repository-url>
 git push -u origin master
 
 

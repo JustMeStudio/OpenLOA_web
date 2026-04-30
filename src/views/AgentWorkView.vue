@@ -1,56 +1,23 @@
-<template>
+﻿<template>
   <div class="agent-work-page">
-    <header class="layout-header">
-      <div class="header-left">
+    <header class="header">
+      <div class="header-content">
         <div class="logo" @click="goHome">
-          <img src="/logo.png" alt="OpenLOA" class="logo-image" />
-        </div>
-        <div class="agent-title">
-          <span class="divider">|</span>
-          <span class="agent-name">{{ agentName }}</span>
-        </div>
-      </div>
-      <div class="header-right">
-        <div class="balance-info">
-          <div class="balance-item">
-            <span class="balance-label">💳 Credit</span>
-            <span class="balance-value">{{ credit }}</span>
+          <div class="logo-container">
+            <img src="/logo.png" alt="OpenLOA" class="logo-image" />
           </div>
-          <div class="balance-item">
-            <span class="balance-label">🔑 Token</span>
-            <span class="balance-value">{{ formatNumber(token) }}</span>
-          </div>
-          <button class="recharge-btn" @click="handleOpenRechargeDialog">
-            💰 充值
-          </button>
         </div>
-        <el-dropdown trigger="click">
-          <div class="user-info">
-            <el-avatar :size="36" :src="userAvatar" icon="UserFilled" />
-            <span class="username">{{ nickName }}</span>
-            <el-icon><ArrowDown /></el-icon>
-          </div>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleProfile">
-                <el-icon><User /></el-icon>
-                {{ t('common.profile') }}
-              </el-dropdown-item>
-              <el-dropdown-item @click="handleSettings">
-                <el-icon><Setting /></el-icon>
-                {{ t('common.settings') }}
-              </el-dropdown-item>
-              <el-dropdown-item @click="handleAssets">
-                <el-icon><Wallet /></el-icon>
-                {{ t('common.assets') }}
-              </el-dropdown-item>
-              <el-dropdown-item divided @click="handleLogout">
-                <el-icon><SwitchButton /></el-icon>
-                {{ t('common.logout') }}
-              </el-dropdown-item>
-            </el-dropdown-menu>
+        <div class="auth-buttons">
+          <template v-if="!isLoggedIn">
+            <el-button type="primary" @click="handleGoLogin">{{ t('common.login') }}</el-button>
           </template>
-        </el-dropdown>
+          <template v-else>
+            <div class="user-info-wrapper">
+              <span class="user-name">{{ userName }}</span>
+              <el-button type="default" @click="handleLogout">{{ t('common.logout') }}</el-button>
+            </div>
+          </template>
+        </div>
       </div>
     </header>
 
@@ -60,7 +27,7 @@
           class="new-chat-btn"
           @click="handleNewConversation"
         >
-          <span>🆕</span>
+          <span>➕</span>
           <span>开启新对话</span>
         </button>
 
@@ -113,40 +80,41 @@
         <div class="chat-split-container">
           <div class="chat-left">
             <div v-if="messages.length === 0" class="welcome">
-              <div class="welcome-avatar">
-                <img :src="agentAvatar" alt="avatar" class="avatar-image" v-if="agentAvatar" />
-                <div class="avatar-placeholder" v-else>🤖</div>
-              </div>
-              <div class="welcome-title">
-                {{ agentNickName }}
-              </div>
-              <div class="welcome-desc">
-                {{ agentDescription }}
-              </div>
-
-              <!-- 使用教程入口 -->
-              <div class="tutorial-entry">
+              <!-- Welcome Card Header -->
+              <div class="welcome-card-header">
+                <div class="welcome-header-content">
+                  <div class="welcome-avatar">
+                    <img :src="agentAvatar" alt="avatar" class="avatar-image" v-if="agentAvatar" />
+                    <div class="avatar-placeholder" v-else>🤖</div>
+                  </div>
+                  <div class="welcome-info">
+                    <div class="welcome-title">{{ agentNickName }}</div>
+                    <div class="welcome-desc">{{ agentDescription }}</div>
+                  </div>
+                </div>
                 <button 
-                  class="tutorial-btn"
+                  class="tutorial-btn-new"
                   @click="handleOpenTutorial"
                   :loading="tutorialLoading"
                 >
-                  <span class="tutorial-icon">📚</span>
-                  <span class="tutorial-text">使用教程</span>
+                  <span class="tutorial-icon">📗</span>
+                  <span>使用教程</span>
                 </button>
               </div>
 
-              <div class="starter-prompts" v-if="starterPrompts.length > 0">
-                <div class="prompts-label">推荐问题：</div>
-                <div class="prompts-list">
-                  <span 
+              <!-- Suggested Questions Grid -->
+              <div class="prompts-section" v-if="starterPrompts.length > 0">
+                <div class="prompts-header">推荐问题</div>
+                <div class="prompts-grid">
+                  <div 
                     v-for="(prompt, index) in starterPrompts" 
                     :key="index" 
-                    class="prompt-item"
+                    class="prompt-card"
                     @click="handleStarterPromptClick(prompt)"
                   >
-                    {{ prompt }}
-                  </span>
+                    <div class="prompt-icon">{{ getPromptEmoji(index) }}</div>
+                    <div class="prompt-text">{{ prompt }}</div>
+                  </div>
                 </div>
               </div>
 
@@ -414,101 +382,7 @@
             </div>
           </div>
 
-          <div class="chat-right">
-            <div class="result-render-panel">
-              <div class="panel-header">
-                <span class="panel-title">输出结果</span>
-              </div>
-              <div class="panel-content">
-                <div class="empty-result" v-if="!selectedResultFile">
-                  <div class="empty-icon">📄</div>
-                  <div class="empty-text">等待AI输出结果文件...</div>
-                </div>
-                <div v-else class="result-display">
-                  <div class="result-file-info">
-                    <span class="file-name">
-                      <span class="file-icon" v-if="selectedResultFile.isImage">🖼️</span>
-                      <span class="file-icon" v-else-if="selectedResultFile.isPdf">📄</span>
-                      <span class="file-icon" v-else-if="selectedResultFile.isText">📝</span>
-                      <span class="file-icon" v-else-if="selectedResultFile.isTable">📊</span>
-                      <span class="file-icon" v-else>📁</span>
-                      {{ selectedResultFile.name }}
-                    </span>
-                    <button 
-                      v-if="selectedResultFile.url" 
-                      @click="handleDownloadFile(selectedResultFile.url, selectedResultFile.name)"
-                      class="download-btn"
-                    >
-                      <span class="download-icon">⬇️</span>
-                      <span>下载文件</span>
-                    </button>
-                  </div>
-                  <div class="result-content">
-                    <div v-if="selectedResultFile.loading" class="loading-state">
-                      <div class="loading-spinner"></div>
-                      <span>文件加载中...</span>
-                    </div>
-                    <div v-else-if="selectedResultFile.error" class="error-state">
-                      <div class="error-icon">⚠️</div>
-                      <span>{{ selectedResultFile.error }}</span>
-                      <button 
-                        v-if="selectedResultFile.url" 
-                        @click="handleDownloadFile(selectedResultFile.url, selectedResultFile.name)"
-                        class="fallback-btn"
-                      >
-                        <span class="download-icon">⬇️</span>
-                        <span>下载文件</span>
-                      </button>
-                    </div>
-                    <div v-else-if="selectedResultFile.isImage" class="image-preview">
-                      <img :src="selectedResultFile.content" :alt="selectedResultFile.name" class="preview-image" />
-                    </div>
-                    <div v-else-if="selectedResultFile.isPdf" class="pdf-preview">
-                      <iframe :src="selectedResultFile.content" class="pdf-iframe"></iframe>
-                    </div>
-                    <div v-else-if="selectedResultFile.isHtml" class="html-preview">
-                      <iframe :src="selectedResultFile.content" class="html-iframe"></iframe>
-                    </div>
-                    <div v-else-if="selectedResultFile.isText" class="text-preview">
-                      <pre class="text-content">{{ selectedResultFile.content }}</pre>
-                    </div>
-                    <div v-else-if="selectedResultFile.isTable" class="table-preview">
-                      <div class="table-container">
-                        <table class="data-table">
-                          <thead v-if="selectedResultFile.tableData && selectedResultFile.tableData.length > 0">
-                            <tr>
-                              <th v-for="(cell, index) in selectedResultFile.tableData[0]" :key="index" class="table-header-cell">
-                                {{ cell }}
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            <tr v-for="(row, rowIndex) in selectedResultFile.tableData.slice(1)" :key="rowIndex" class="table-row">
-                              <td v-for="(cell, colIndex) in row" :key="colIndex" class="table-cell" :title="cell">
-                                {{ cell }}
-                              </td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                    <div v-else class="other-preview">
-                      <div class="file-icon">📁</div>
-                      <span>不支持的文件格式</span>
-                      <button 
-                        v-if="selectedResultFile.url" 
-                        @click="handleDownloadFile(selectedResultFile.content, selectedResultFile.name)"
-                        class="fallback-btn"
-                      >
-                        <span class="download-icon">⬇️</span>
-                        <span>下载文件</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          
         </div>
       </section>
     </main>
@@ -552,188 +426,7 @@
       </template>
     </el-dialog>
 
-    <!-- 充值弹窗 -->
-    <el-dialog
-      v-model="showRechargeDialog"
-      title="充值账户"
-      width="700px"
-      :close-on-click-modal="false"
-    >
-      <div class="recharge-dialog-content">
-        <div class="recharge-main">
-          <!-- 套餐列表 - 左侧 -->
-          <div class="packages-section" v-if="packages.length > 0">
-            <div class="section-title">选择套餐</div>
-            <div class="packages-grid">
-              <div 
-                v-for="pkg in packages" 
-                :key="pkg.name"
-                class="package-card"
-                :class="{ active: selectedPackage === pkg.name }"
-                @click="selectedPackage = pkg.name; customAmount = ''"
-              >
-                <div class="package-amount">¥{{ pkg.amount }}</div>
-                <div class="package-description">{{ pkg.description }}</div>
-                <div class="package-benefits">
-                  <span class="benefit">💳 +{{ pkg.credit }} Credit</span>
-                  <span class="benefit">🔑 +{{ formatNumber(pkg.token) }} Token</span>
-                </div>
-                <div class="package-discount" v-if="pkg.discount < 1">
-                  节省 {{ ((1 - pkg.discount) * 100).toFixed(0) }}%
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <!-- 右侧分隔线 -->
-          <div class="divider-vertical"></div>
-
-          <!-- 自定义金额 - 右侧 -->
-          <div class="custom-section">
-            <div class="section-title">或自定义充值</div>
-            <div class="custom-content">
-              <div class="custom-input-wrapper">
-                <el-input-number 
-                  v-model="customAmount"
-                  @change="selectedPackage = null"
-                  :min="0"
-                  :max="99999"
-                  placeholder="输入金额（元）"
-                  class="custom-input"
-                />
-                <span v-if="customPriceLoading" class="loading-text">计算中...</span>
-              </div>
-              
-              <!-- 自定义金额的预览信息 -->
-              <div class="custom-preview" v-if="customAmount && customPriceInfo">
-                <div class="preview-row">
-                  <span class="label">金额</span>
-                  <span class="value price">¥{{ customPriceInfo.amount }}</span>
-                </div>
-                <div class="preview-row" v-if="customPriceInfo.discount_rate < 1">
-                  <span class="label">优惠</span>
-                  <span class="value discount">节省 {{ ((1 - customPriceInfo.discount_rate) * 100).toFixed(0) }}%</span>
-                </div>
-                <div class="preview-row">
-                  <span class="label">Credit</span>
-                  <span class="value benefit-text">+{{ customPriceInfo.credit }}</span>
-                </div>
-                <div class="preview-row">
-                  <span class="label">Token</span>
-                  <span class="value benefit-text">+{{ formatNumber(customPriceInfo.token) }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 套餐选中后的费用预览 -->
-        <div class="price-preview" v-if="selectedPackage && !customAmount">
-          <div class="preview-item">
-            <span>充值金额:</span>
-            <span class="price">¥{{ getRechargeAmount() }}</span>
-          </div>
-          <div class="preview-item" v-if="getRechargeInfo().discount > 0">
-            <span>优惠:</span>
-            <span class="discount">节省 {{ (getRechargeInfo().discount * 100).toFixed(0) }}%</span>
-          </div>
-          <div class="preview-item">
-            <span>获得 Credit:</span>
-            <span class="benefit-text">{{ getRechargeInfo().credit }} 个</span>
-          </div>
-          <div class="preview-item">
-            <span>获得 Token:</span>
-            <span class="benefit-text">{{ formatNumber(getRechargeInfo().token) }} 个</span>
-          </div>
-        </div>
-      </div>
-
-      <template #footer>
-        <el-button @click="showRechargeDialog = false">取消</el-button>
-        <el-button 
-          type="primary" 
-          @click="handleRecharge"
-          :loading="loadingRecharge"
-          :disabled="!(selectedPackage || customAmount)"
-        >
-          确认充值
-        </el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 支付成功弹窗 -->
-    <el-dialog
-      v-model="showPaymentSuccessDialog"
-      title="支付成功"
-      width="420px"
-      align-center
-      :close-on-click-modal="false"
-    >
-      <div class="payment-success-content">
-        <div class="payment-success-icon">
-          <el-icon :size="56" color="#22c55e"><CircleCheck /></el-icon>
-        </div>
-        <div class="payment-success-title">充值成功！</div>
-        <div class="payment-success-order">订单号：{{ paymentSuccessOrderId }}</div>
-        <div class="payment-success-tip">账户余额已更新，感谢您的充值。</div>
-      </div>
-      <template #footer>
-        <el-button type="primary" @click="showPaymentSuccessDialog = false">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 悬浮公告面板 -->
-    <div class="announcement-floating-panel" :class="{ active: showAnnouncementPanel }">
-      <div v-if="showAnnouncementPanel" class="announcement-panel-content">
-        <div class="panel-header">
-          <span class="panel-title">📢 公告板</span>
-          <button class="close-btn" @click="showAnnouncementPanel = false">✕</button>
-        </div>
-        <div class="panel-body">
-          <div v-if="loadingAnnouncements" class="loading-announcement">
-            <span class="spinner"></span>
-            <span>加载中...</span>
-          </div>
-          <div v-else-if="announcements.length === 0" class="no-announcement">
-            暂无公告
-          </div>
-          <div v-else class="announcements-list">
-            <div 
-              v-for="(announcement, index) in announcements"
-              :key="index"
-              class="announcement-item"
-              :class="{ active: index === currentAnnouncementIndex }"
-              @click="currentAnnouncementIndex = index"
-            >
-              <div class="item-header">
-                <span class="item-type" :class="`type-${announcement.type}`">
-                  {{ getAnnouncementTypeLabel(announcement.type) }}
-                </span>
-                <span class="item-badge" v-if="index === currentAnnouncementIndex">●</span>
-              </div>
-              <div class="item-title">{{ announcement.title }}</div>
-              <div class="item-message">{{ announcement.message }}</div>
-              <div v-if="announcement.startTime" class="item-time">
-                {{ announcement.startTime }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 悬浮公告按钮 -->
-    <button 
-      class="announcement-float-btn"
-      @click="handleToggleAnnouncementPanel"
-      :title="`${announcements.length} 条公告`"
-    >
-      <span class="float-btn-icon">📢</span>
-      <span class="float-btn-count" v-if="announcements.length > 0">{{ announcements.length }}</span>
-    </button>
-
-    <!-- AI客服模块 -->
-    <CustomerServiceChat />
   </div>
 </template>
 
@@ -744,10 +437,9 @@ import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MarkdownRender } from 'markstream-vue'
 import { Workbook } from 'exceljs'
-import { refreshToken, getProfile } from '@/api/auth'
-import { queryAllAgentsInfo, getPresignedUrl, getBillingBalance, getPackages, recharge, calculateCustomPrice, getAnnouncements, getPaymentStatus } from '@/api/agent'
+import { refreshToken } from '@/api/auth'
+import { queryAllAgentsInfo, getPresignedUrl } from '@/api/agent'
 import { isImageFile, compressImage } from '@/utils/imageCompress'
-import CustomerServiceChat from '@/components/CustomerServiceChat.vue'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -758,129 +450,8 @@ const agentNickName = ref('')
 const agentAvatar = ref('')
 const agentDescription = ref('')
 const starterPrompts = ref([])
-const nickName = ref(localStorage.getItem('nick_name') || '用户')
-const userAvatar = ref('')
-const credit = ref(0)
-const token = ref(0)
-
-// 公告数据
-const announcements = ref([])
-const loadingAnnouncements = ref(false)
-const currentAnnouncementIndex = ref(0)
-
-// 加载公告数据
-const loadAnnouncements = async (lang = null) => {
-  if (loadingAnnouncements.value) return
-  
-  loadingAnnouncements.value = true
-  try {
-    // 如果未提供语言参数，使用当前 locale
-    const language = lang || getLanguageCode(locale.value)
-    const response = await getAnnouncements({ language })
-    if (response && response.data) {
-      announcements.value = response.data
-    } else {
-      announcements.value = []
-    }
-  } catch (error) {
-    console.error('获取公告失败:', error)
-    announcements.value = []
-    ElMessage.error('获取公告失败，请稍后重试')
-  } finally {
-    loadingAnnouncements.value = false
-  }
-}
-
-// 公告面板相关
-const showAnnouncementPanel = ref(false)
-
-const getAnnouncementTypeLabel = (type) => {
-  const typeMap = {
-    'maintenance': '🔧 维护',
-    'important': '⚠️ 重要',
-    'feature': '✨ 新功能',
-    'update': '📝 更新'
-  }
-  return typeMap[type] || '📢 公告'
-}
-
-// 处理公告面板的打开/关闭
-const handleToggleAnnouncementPanel = async () => {
-  showAnnouncementPanel.value = !showAnnouncementPanel.value
-  
-  // 打开时加载公告数据
-  if (showAnnouncementPanel.value && announcements.value.length === 0) {
-    await loadAnnouncements()
-  }
-}
-
-// 充值相关
-const showRechargeDialog = ref(false)
-const packages = ref([])
-const selectedPackage = ref(null)
-const customAmount = ref('')
-const loadingPackages = ref(false)
-const loadingRecharge = ref(false)
-const customPriceInfo = ref(null)
-const customPriceLoading = ref(false)
-let customPriceDebounceTimer = null
-
-// 支付轮询相关
-let paymentPollingTimer = null
-let paymentWindow = null
-const showPaymentSuccessDialog = ref(false)
-const paymentSuccessOrderId = ref('')
-
-const stopPaymentPolling = () => {
-  if (paymentPollingTimer) {
-    clearInterval(paymentPollingTimer)
-    paymentPollingTimer = null
-  }
-}
-
-const openPaymentWindow = (htmlContent) => {
-  const popup = window.open('', '_blank', 'width=900,height=700,scrollbars=yes,resizable=yes')
-  if (popup) {
-    popup.document.open()
-    popup.document.write(htmlContent)
-    popup.document.close()
-    paymentWindow = popup
-  } else {
-    ElMessage.warning('弹窗被浏览器拦截，请允许弹窗后重试')
-  }
-}
-
-const startPaymentPolling = (orderId) => {
-  stopPaymentPolling()
-  paymentPollingTimer = setInterval(async () => {
-    try {
-      const res = await getPaymentStatus(orderId)
-      if (res && res.payment_status === 'paid') {
-        stopPaymentPolling()
-        // 关闭支付宝弹窗（跨域，无法向其写入内容）
-        if (paymentWindow && !paymentWindow.closed) {
-          paymentWindow.close()
-        }
-        // 在主页面显示支付成功弹窗
-        paymentSuccessOrderId.value = orderId
-        showPaymentSuccessDialog.value = true
-        // 刷新余额信息
-        try {
-          const balanceData = await getBillingBalance()
-          if (balanceData) {
-            credit.value = balanceData.credit || 0
-            token.value = balanceData.token || 0
-          }
-        } catch (e) {
-          console.error('Failed to refresh balance:', e)
-        }
-      }
-    } catch (e) {
-      console.error('Payment status polling error:', e)
-    }
-  }, 3000)
-}
-
+const userName = computed(() => localStorage.getItem('nick_name') || '用户')
+const isLoggedIn = computed(() => !!localStorage.getItem('access_token'))
 // 教程相关
 const showTutorialDialog = ref(false)
 const tutorialContent = ref('')
@@ -1090,24 +661,7 @@ const parseCSV = (csvText) => {
   return data
 }
 
-// 刷新余额信息
-const loadBalance = async () => {
-  try {
-    const balanceData = await getBillingBalance()
-    if (balanceData) {
-      credit.value = balanceData.credit || 0
-      token.value = balanceData.token || 0
-    }
-  } catch (error) {
-    console.error('Failed to fetch billing balance:', error)
-  }
-}
 
-// 延迟刷新余额
-const loadBalanceDelayed = async (delayMs = 2000) => {
-  await new Promise(resolve => setTimeout(resolve, delayMs))
-  await loadBalance()
-}
 
 const handleConfirmToolExecution = async (confirmed, toolConfirmationId) => {
   try {
@@ -1132,9 +686,6 @@ const handleConfirmToolExecution = async (confirmed, toolConfirmationId) => {
       
       // 移除确认消息框
       messages.value = messages.value.filter(msg => msg.id !== toolConfirmationId)
-      
-      // 延迟2秒后刷新余额（给后端处理时间）
-      loadBalanceDelayed(2000)
     } else {
       ElMessage.error('确认失败，请重试')
     }
@@ -1291,14 +842,8 @@ const handleStopGeneration = async () => {
         ElMessage.warning('停止生成请求失败')
       }
     }
-  } catch (error) {
-    console.error('停止生成错误:', error)
-    ElMessage.error('停止生成出现错误')
   } finally {
     isGenerating.value = false
-    
-    // 停止生成后也应用延迟刷新（应用时间可能也会有消费）
-    loadBalanceDelayed(2000)
   }
 }
 
@@ -1979,9 +1524,6 @@ const handleSendMessage = async () => {
   } finally {
     isLoading.value = false
     isGenerating.value = false
-    
-    // AI一轮对话完成，延迟刷新余额（给后端处理时间）
-    loadBalanceDelayed(2000)
   }
 }
 
@@ -2233,16 +1775,8 @@ const goHome = () => {
   router.push('/')
 }
 
-const handleProfile = () => {
-  router.push('/profile')
-}
-
-const handleSettings = () => {
-  router.push('/settings')
-}
-
-const handleAssets = () => {
-  router.push('/assets')
+const handleGoLogin = () => {
+  router.push('/auth')
 }
 
 const handleLogout = async () => {
@@ -2265,6 +1799,10 @@ const handleLogout = async () => {
   } catch (error) {
     console.log('取消退出')
   }
+}
+
+const getLanguageCode = (localeValue) => {
+  return localeValue === 'zh-CN' ? 'zh' : 'en'
 }
 
 onMounted(async () => {
@@ -2313,12 +1851,6 @@ onMounted(async () => {
     console.error('Failed to fetch user profile:', error)
     // 如果获取失败，继续使用默认头像
   }
-
-  // 获取余额信息
-  await loadBalance()
-  
-  // 获取公告信息
-  await loadAnnouncements()
   
   fetchConversationHistory()
 })
@@ -2339,24 +1871,17 @@ watch(() => route.path, async (newPath) => {
       console.error('Failed to refresh user profile:', error)
     }
 
-    // 重新获取余额信息
-    try {
-      const balanceData = await getBillingBalance()
-      if (balanceData) {
-        credit.value = balanceData.credit || 0
-        token.value = balanceData.token || 0
-      }
-    } catch (error) {
-      console.error('Failed to refresh billing balance:', error)
-    }
+
   }
 })
 
-// 监听语言变化，重新加载公告（使用新的语言）
-watch(() => locale.value, async (newLocale) => {
-  const language = getLanguageCode(newLocale)
-  await loadAnnouncements(language)
-})
+// 推荐问题的emoji列表 - 支持循环分配
+const promptEmojis = ['💡', '❓', '💬', '🎯', '🚀', '✨', '🔍', '💭', '🎨', '⚡']
+
+// 根据索引获取对应的emoji，超过数量则循环
+const getPromptEmoji = (index) => {
+  return promptEmojis[index % promptEmojis.length]
+}
 
 const handleStarterPromptClick = (prompt) => {
   inputMessage.value = prompt
@@ -2394,471 +1919,230 @@ const handleOpenTutorial = async () => {
   }
 }
 
-const getLanguageCode = (localeValue) => {
-  return localeValue === 'zh-CN' ? 'zh' : 'en'
-}
-
-const formatNumber = (num) => {
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(2) + 'M'
-  } else if (num >= 1000) {
-    return (num / 1000).toFixed(2) + 'K'
-  }
-  return num.toString()
-}
-
-const handleOpenRechargeDialog = async () => {
-  showRechargeDialog.value = true
-  selectedPackage.value = null
-  customAmount.value = ''
-  customPriceInfo.value = null
-  
-  if (packages.value.length === 0) {
-    loadingPackages.value = true
-    try {
-      const data = await getPackages()
-      if (data && Array.isArray(data)) {
-        packages.value = data
-      }
-    } catch (error) {
-      console.error('Failed to fetch packages:', error)
-      ElMessage.error('获取套餐列表失败，请重试')
-    } finally {
-      loadingPackages.value = false
-    }
-  }
-}
-
-const getRechargeAmount = () => {
-  if (selectedPackage.value) {
-    const pkg = packages.value.find(p => p.name === selectedPackage.value)
-    return pkg ? pkg.amount : 0
-  }
-  // 自定义金额时，使用接口返回的实际金额（可能应用了折扣）
-  if (customPriceInfo.value) {
-    return customPriceInfo.value.amount
-  }
-  return customAmount.value || 0
-}
-
-const getRechargeInfo = () => {
-  if (selectedPackage.value) {
-    const pkg = packages.value.find(p => p.name === selectedPackage.value)
-    if (pkg) {
-      return {
-        credit: pkg.credit,
-        token: pkg.token,
-        // pkg.discount表示实际支付比例（1.0无折扣，0.98表示只需支付98%），所以折扣率应该是1-discount
-        discount: 1 - pkg.discount
-      }
-    }
-  } else if (customPriceInfo.value) {
-    // 使用从接口获取的数据
-    // discount_rate表示实际支付比例（1.0无折扣，0.98表示只需支付98%），所以折扣率应该是1-discount_rate
-    return {
-      credit: customPriceInfo.value.credit,
-      token: customPriceInfo.value.token,
-      discount: 1 - customPriceInfo.value.discount_rate
-    }
-  }
-  return { credit: 0, token: 0, discount: 0 }
-}
-
-// 监听自定义金额输入，调用接口获取计算结果
-watch(() => customAmount.value, async (newAmount) => {
-  // 清除之前的定时器
-  if (customPriceDebounceTimer) {
-    clearTimeout(customPriceDebounceTimer)
-  }
-  
-  // 如果没有输入或选择了套餐，清空缓存
-  if (!newAmount || selectedPackage.value) {
-    customPriceInfo.value = null
-    return
-  }
-
-  const amount = parseFloat(newAmount)
-  if (isNaN(amount) || amount <= 0) {
-    customPriceInfo.value = null
-    return
-  }
-
-  // 防抖：500ms后才发送请求
-  customPriceDebounceTimer = setTimeout(async () => {
-    try {
-      customPriceLoading.value = true
-      const result = await calculateCustomPrice(amount)
-      if (result) {
-        customPriceInfo.value = result
-      }
-    } catch (error) {
-      console.error('Failed to calculate custom price:', error)
-      customPriceInfo.value = null
-    } finally {
-      customPriceLoading.value = false
-    }
-  }, 500)
-})
-
-const handleRecharge = async () => {
-  if (!selectedPackage.value && !customAmount.value) {
-    ElMessage.error('请选择套餐或输入自定义金额')
-    return
-  }
-
-  loadingRecharge.value = true
-  try {
-    const rechargeData = selectedPackage.value 
-      ? { package_name: selectedPackage.value }
-      : { custom_amount: parseFloat(customAmount.value) }
-
-    const result = await recharge(rechargeData)
-    
-    if (result && result.html_content) {
-      showRechargeDialog.value = false
-      openPaymentWindow(result.html_content)
-      startPaymentPolling(result.order_id)
-    }
-  } catch (error) {
-    console.error('Recharge failed:', error)
-    // 错误消息已由request拦截器处理，这里只需要记录日志
-  } finally {
-    loadingRecharge.value = false
-  }
-}
 </script>
 
 <style scoped lang="scss">
+// ── Design tokens ─────────────────────────────────────────────────────────
+$primary: #6366f1;
+$primary-dark: #4f46e5;
+$text: #111827;
+$text-muted: #6b7280;
+$bg: #f8f9fb;
+$border: #e5e7eb;
+$sidebar-w: 260px;
+$header-h: 56px;
+
+// ── Page shell ─────────────────────────────────────────────────────────────
 .agent-work-page {
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #f9fafb 100%);
-}
-
-.layout-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #fafbfc;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  padding: 0 20px;
-  height: 60px;
-  flex-shrink: 0;
-
-  .header-left {
-    display: flex;
-    align-items: center;
-
-    .logo {
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-      transition: transform 0.3s;
-
-      &:hover {
-        transform: scale(1.05);
-      }
-
-      .logo-image {
-        width: 150px;
-        height: 100px;
-        object-fit: contain;
-      }
-
-      .logo-text {
-        margin-left: 8px;
-        font-size: 18px;
-        font-weight: 700;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-      }
-    }
-
-    .agent-title {
-      display: flex;
-      align-items: center;
-      margin-left: 16px;
-
-      .divider {
-        color: #d9dce2;
-        margin: 0 12px;
-      }
-
-      .agent-name {
-        font-size: 16px;
-        color: #303133;
-        font-weight: 500;
-      }
-    }
-  }
-
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-
-    .balance-info {
-      display: flex;
-      gap: 20px;
-      align-items: center;
-      padding-right: 10px;
-      border-right: 1px solid #e8e9eb;
-
-      .balance-item {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 2px;
-
-        .balance-label {
-          font-size: 12px;
-          color: #909399;
-          font-weight: 500;
-        }
-
-        .balance-value {
-          font-size: 16px;
-          font-weight: 600;
-          background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-      }
-
-      .recharge-btn {
-        padding: 8px 16px;
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        color: white;
-        border: none;
-        border-radius: 6px;
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all 0.3s;
-        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
-
-        &:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-        }
-
-        &:active {
-          transform: translateY(0);
-        }
-      }
-    }
-
-    .user-info {
-      display: flex;
-      align-items: center;
-      cursor: pointer;
-      padding: 8px 12px;
-      border-radius: 4px;
-      transition: background-color 0.3s;
-
-      &:hover {
-        background-color: #f0f1f3;
-      }
-
-      .username {
-        margin: 0 10px;
-        font-size: 14px;
-        color: #606266;
-      }
-
-      :deep(.el-icon) {
-        color: #909399;
-      }
-    }
-  }
-}
-
-.main-content {
-  display: flex;
-  flex: 1;
+  background: $bg;
   overflow: hidden;
 }
 
-.sidebar {
-  width: 300px;
+// ── Header ─────────────────────────────────────────────────────────────────
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
   background: #fff;
-  border-right: 1px solid #e8e9eb;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid $border;
+  z-index: 100;
+  padding: 0 24px;
+}
 
-  .new-chat-btn {
+.header-content {
+  max-width: 1400px;
+  margin: 0 auto;
+  height: 60px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 24px;
+}
+
+.logo {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  .logo-image { width: 90px; height: 56px; object-fit: contain; }
+}
+
+.auth-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+
+  .user-info-wrapper {
     display: flex;
     align-items: center;
     gap: 10px;
-    width: calc(100% - 32px);
-    margin: 20px 16px;
-    padding: 14px 20px;
-    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-    border: none;
-    border-radius: 12px;
-    font-size: 15px;
-    font-weight: 500;
-    color: #fff;
-    cursor: pointer;
-    transition: all 0.3s;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
-    }
-
-    span:first-child {
-      font-size: 18px;
-    }
   }
+  .user-name { color: $text; font-weight: 500; font-size: 0.95rem; }
 
-  .conversation-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0 12px 20px;
-
-    .loading,
-    .empty {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 60px 20px;
-      color: #999;
-      font-size: 14px;
-
-      .empty-icon {
-        font-size: 48px;
-        margin-bottom: 16px;
-        opacity: 0.5;
-      }
-    }
-
-    .conversation-item {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      padding: 14px 16px;
-      margin-bottom: 10px;
-      border-radius: 12px;
-      background: #fff;
-      border: 1px solid #f0f0f0;
-      cursor: pointer;
-      transition: all 0.3s;
-
-      &:hover {
-        background: linear-gradient(135deg, #f5f7ff 0%, #ecf5ff 100%);
-        border-color: #e0e7ff;
-        transform: translateX(4px);
-      }
-
-      &.active {
-        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-        border-color: #6366f1;
-        box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
-
-        .conversation-title {
-          color: #fff;
-        }
-
-        .conversation-time {
-          color: rgba(255, 255, 255, 0.8);
-        }
-
-        .menu-btn {
-          color: rgba(255, 255, 255, 0.7);
-
-          &:hover {
-            background: rgba(255, 255, 255, 0.1);
-          }
-        }
-      }
-
-      .conversation-info {
-        flex: 1;
-        overflow: hidden;
-
-        .conversation-title {
-          font-size: 15px;
-          color: #333;
-          font-weight: 500;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          margin-bottom: 6px;
-        }
-
-        .conversation-time {
-          font-size: 12px;
-          color: #999;
-        }
-      }
-
-      .menu-btn {
-        width: 32px;
-        height: 32px;
-        border: none;
-        background: transparent;
-        cursor: pointer;
-        font-size: 16px;
-        color: #999;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-
-        &:hover {
-          background: #f5f5f5;
-          color: #666;
-        }
-      }
-    }
-
-    .context-menu {
-      position: absolute;
-      background: #fff;
-      border-radius: 10px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-      border: 1px solid #e8e9eb;
-      z-index: 100;
-      padding: 6px 0;
-      min-width: 120px;
-
-      button {
-        display: block;
-        width: 100%;
-        padding: 10px 16px;
-        border: none;
-        background: transparent;
-        text-align: left;
-        font-size: 14px;
-        color: #ff4d4f;
-        cursor: pointer;
-        border-radius: 6px;
-        transition: all 0.2s;
-
-        &:hover {
-          background: #fff2f0;
-          color: #cf1322;
-        }
-      }
-    }
+  :deep(.el-button--primary) {
+    background: $primary;
+    border-color: $primary;
+    &:hover { background: $primary-dark; border-color: $primary-dark; }
+  }
+  :deep(.el-button--text), :deep(.el-button.is-text) {
+    color: $primary;
+    &:hover { background: rgba(99,102,241,0.08); }
+  }
+  :deep(.el-button--default) {
+    color: $text-muted;
+    border-color: $border;
+    &:hover { color: $primary; border-color: $primary; }
   }
 }
 
-.chat-area {
+// ── Main layout ─────────────────────────────────────────────────────────────
+.main-content {
   flex: 1;
+  display: flex;
+  overflow: hidden;
+  margin-top: 60px;
+}
+
+.sidebar {
+  width: $sidebar-w;
+  background: #fff;
+  border-right: 1px solid $border;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex-shrink: 0;
+}
+
+.new-chat-btn {
+  width: 100%;
+  margin: 12px 0;
+  padding: 12px 16px;
+  background: transparent;
+  color: $primary;
+  border: 2px solid $primary;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+  &:hover {
+    background: $primary;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    transform: translateY(-2px);
+  }
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+.conversation-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px;
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+}
+
+.loading, .empty {
+  padding: 20px;
+  text-align: center;
+  color: $text-muted;
+  font-size: 0.85rem;
+}
+
+.conversation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+  &:hover { background: #f3f4f6; }
+  &.active { background: #eef2ff; }
+  .conversation-info {
+    flex: 1;
+    min-width: 0;
+    .conversation-title {
+      font-size: 0.875rem;
+      color: $text;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-weight: 500;
+    }
+    .conversation-time {
+      font-size: 0.75rem;
+      color: $text-muted;
+      margin-top: 2px;
+    }
+  }
+  .menu-btn {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: $text-muted;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.15s, background 0.15s;
+    &:hover { background: #e5e7eb; color: $text; }
+  }
+  &:hover .menu-btn { opacity: 1; }
+}
+
+.context-menu {
+  position: absolute;
   background: #fff;
+  border: 1px solid $border;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  z-index: 100;
+  min-width: 120px;
+  padding: 4px;
+  button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 7px 12px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    color: #dc2626;
+    border-radius: 6px;
+    transition: background 0.15s;
+    &:hover { background: #fef2f2; }
+  }
+}
+
+// ── Chat area ─────────────────────────────────────────────────────────────
+.chat-area {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
 }
 
 .chat-split-container {
@@ -2872,2156 +2156,538 @@ const handleRecharge = async () => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  min-width: 0;
-  background: #fff;
-  border-right: 1px solid #e8e9eb;
+  background: $bg;
 }
 
-.chat-right {
-  width: 50%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: #fff;
-  padding: 20px;
-}
-
-.result-render-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
-  border-radius: 8px;
-  border: 1px solid #e8e9eb;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-}
-
-.panel-header {
-  padding: 16px 20px;
-  background: linear-gradient(135deg, #fafbfc 0%, #ffffff 100%);
-  border-bottom: 1px solid #e8e9eb;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-shrink: 0;
-}
-
-.panel-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #333;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  .panel-icon {
-    font-size: 16px;
-  }
-}
-
-.panel-content {
-  flex: 1;
-  overflow: auto;
-  padding: 20px;
-}
-
-.empty-result {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #999;
-
-  .empty-icon {
-    font-size: 64px;
-    margin-bottom: 20px;
-    opacity: 0.4;
-  }
-
-  .empty-text {
-    font-size: 15px;
-    color: #666;
-  }
-}
-
-.empty-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.empty-text {
-  font-size: 14px;
-}
-
-.result-display {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  flex: 1;
-  height: 100%;
-  min-height: 0;
-}
-
-.result-file-info {
-  padding: 14px 20px;
-  background: linear-gradient(135deg, #f8f9fc 0%, #ffffff 100%);
-  border: 1px solid #e8e9eb;
-  border-radius: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.file-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #333;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  .file-icon {
-    font-size: 18px;
-  }
-}
-
-.download-link {
-  font-size: 14px;
-  color: #409eff;
-  text-decoration: none;
-  cursor: pointer;
-  padding: 6px 12px;
-  background: #f0f7ff;
-  border-radius: 6px;
-  transition: all 0.2s;
-
-  &:hover {
-    background: #e6f4ff;
-    color: #3a8ee6;
-  }
-}
-
-.download-btn,
-.fallback-btn,
-.preview-action-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: #fff;
-  cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-
-  .download-icon {
-    font-size: 16px;
-  }
-}
-
-.fallback-btn {
-  background: linear-gradient(135deg, #f56c6c 0%, #ea6c6c 100%);
-  box-shadow: 0 2px 6px rgba(245, 108, 108, 0.3);
-
-  &:hover {
-    box-shadow: 0 4px 12px rgba(245, 108, 108, 0.4);
-  }
-}
-
-.preview-action-btn {
-  margin-top: 16px;
-  background: linear-gradient(135deg, #409eff 0%, #66b0ff 100%);
-  box-shadow: 0 2px 6px rgba(64, 158, 255, 0.3);
-
-  &:hover {
-    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
-  }
-}
-
-.result-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  border: 1px solid #e8e9eb;
-  border-radius: 12px;
-  padding: 8px;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-.loading-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 16px;
-  padding: 40px;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e8e9eb;
-  border-top: 4px solid #6366f1;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.error-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 16px;
-  color: #f56c6c;
-  padding: 40px;
-}
-
-.error-icon {
-  font-size: 48px;
-}
-
-.fallback-link,
-.open-link {
-  font-size: 14px;
-  color: #409eff;
-  text-decoration: none;
-  cursor: pointer;
-  margin-top: 12px;
-  padding: 8px 16px;
-  background: #f0f7ff;
-  border-radius: 8px;
-  transition: all 0.2s;
-
-  &:hover {
-    background: #e6f4ff;
-    color: #3a8ee6;
-  }
-}
-
-.image-preview {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.preview-image {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-}
-
-.pdf-preview {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.pdf-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
-.html-preview {
-  width: 100%;
-  flex: 1;
-  overflow: auto;
-  min-height: 0;
-  background: #fff;
-  border-radius: 4px;
-  padding: 12px;
-}
-
-.html-iframe {
-  width: 100%;
-  height: 100%;
-  border: 1px solid #e5e7eb;
-  border-radius: 4px;
-  display: block;
-}
-
-.text-preview {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-}
-
-.text-content {
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 16px;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #333;
-  background: #fafafa;
-  border-radius: 8px;
-  box-sizing: border-box;
-}
-
-.table-preview {
-  width: 100%;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: auto;
-}
-
-.table-container {
-  flex: 1;
-  overflow: auto;
-  padding: 16px;
-  box-sizing: border-box;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow: hidden;
-  font-size: 14px;
-}
-
-.table-header-cell {
-  padding: 12px 16px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%);
-  color: white;
-  font-weight: 600;
-  border: 1px solid #ddd;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.table-row {
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.table-row:hover {
-  background: #f9f5ff;
-}
-
-.table-cell {
-  padding: 12px 16px;
-  border: 1px solid #e5e7eb;
-  color: #333;
-  max-width: 250px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  cursor: help;
-}
-
-.other-preview {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  gap: 12px;
-  color: #666;
-}
-
-.file-icon {
-  font-size: 48px;
-}
-
+// ── Welcome ─────────────────────────────────────────────────────────────────
 .welcome {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-
-  .welcome-avatar {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    overflow: hidden;
-    margin-bottom: 24px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    .avatar-image {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    .avatar-placeholder {
-      font-size: 32px;
-      color: white;
-    }
-  }
-
-  .welcome-title {
-    font-size: 24px;
-    color: #333;
-    font-weight: 600;
-    margin-bottom: 12px;
-  }
-
-  .welcome-desc {
-    font-size: 16px;
-    color: #666;
-    max-width: 500px;
-    text-align: center;
-    margin-bottom: 24px;
-  }
-
-  .tutorial-entry {
-    margin-bottom: 24px;
-    display: flex;
-    justify-content: center;
-
-    .tutorial-btn {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 24px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      border-radius: 24px;
-      font-size: 15px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.3s ease;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-
-      .tutorial-icon {
-        font-size: 18px;
-        transition: transform 0.3s ease;
-      }
-
-      .tutorial-text {
-        letter-spacing: 0.5px;
-      }
-
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-
-        .tutorial-icon {
-          transform: scale(1.15) rotate(-5deg);
-        }
-      }
-
-      &:active {
-        transform: translateY(0);
-      }
-    }
-  }
-
-  .starter-prompts {
-    margin-bottom: 32px;
-
-    .prompts-label {
-      font-size: 14px;
-      color: #999;
-      margin-bottom: 12px;
-    }
-
-    .prompts-list {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 12px;
-
-      .prompt-item {
-        padding: 8px 16px;
-        background: #fff;
-        border: 1px solid #e0e0e0;
-        border-radius: 20px;
-        font-size: 14px;
-        color: #409eff;
-        cursor: pointer;
-        transition: all 0.3s;
-
-        &:hover {
-          background: #f0f7ff;
-          border-color: #409eff;
-          color: #3a8ee6;
-        }
-      }
-    }
-  }
-
-  .input-section {
-    width: 100%;
-    max-width: 700px;
-
-    .selected-files-preview {
-      margin-bottom: 16px;
-      padding: 12px 16px;
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
-      border-radius: 8px;
-      max-height: 200px;
-      overflow-y: auto;
-
-      .preview-title {
-        font-size: 13px;
-        color: #666;
-        font-weight: 500;
-        margin-bottom: 8px;
-      }
-
-      .files-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-
-        .file-preview-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 8px 12px;
-          background: #fff;
-          border: 1px solid #dee2e6;
-          border-radius: 6px;
-          font-size: 13px;
-
-          .file-icon {
-            font-size: 16px;
-            flex-shrink: 0;
-          }
-
-          .file-name {
-            flex: 1;
-            color: #333;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          }
-
-          .file-status {
-            font-size: 12px;
-            color: #6366f1;
-            flex-shrink: 0;
-          }
-
-          .file-remove-btn {
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            color: #999;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.2s;
-            flex-shrink: 0;
-
-            &:hover {
-              background: #fff3cd;
-              border-color: #ffc107;
-              color: #ff6b6b;
-            }
-          }
-
-          &.is-image {
-            flex-direction: column;
-            align-items: flex-start;
-            padding: 8px;
-            gap: 6px;
-          }
-
-          .image-thumbnail {
-            width: 100%;
-            height: 60px;
-            object-fit: cover;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-            flex-shrink: 0;
-          }
-
-          .file-info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-
-            .file-name {
-              flex: 1;
-              color: #333;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-              font-size: 12px;
-            }
-
-            .file-status {
-              font-size: 11px;
-              color: #6366f1;
-              flex-shrink: 0;
-            }
-
-            .file-remove-btn {
-              width: 20px;
-              height: 20px;
-              padding: 0;
-              flex-shrink: 0;
-            }
-          }
-        }
-      }
-    }
-
-    .input-wrapper {
-      position: relative;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-      border: 1px solid #e0e0e0;
-
-      textarea {
-        width: 100%;
-        min-height: 120px;
-        padding: 16px;
-        padding-right: 100px;
-        border: none;
-        border-radius: 12px;
-        font-size: 14px;
-        line-height: 1.5;
-        outline: none;
-        resize: vertical;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      }
-
-      .input-actions {
-        position: absolute;
-        bottom: 12px;
-        right: 16px;
-        display: flex;
-        gap: 8px;
-
-        .upload-btn {
-          width: 36px;
-          height: 36px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #fff;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          font-size: 16px;
-          cursor: pointer;
-
-          &:hover {
-            background: #f5f5f5;
-          }
-        }
-
-        .send-btn {
-          padding: 8px 20px;
-          background: #6366f1;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          font-size: 14px;
-          cursor: pointer;
-          transition: all 0.2s;
-
-          &:hover:not(:disabled) {
-            background: #5558e3;
-          }
-
-          &:disabled {
-            background: #f0f0f0;
-            color: #999;
-            cursor: not-allowed;
-          }
-        }
-      }
-    }
-  }
+  justify-content: flex-start;
+  padding: 20px 24px 40px;
+  width: 100%;
+  gap: 24px;
+  overflow-y: auto;
+  background: linear-gradient(135deg, #f8f9fb 0%, #f0f3ff 100%);
 }
 
-.chat-messages {
+.welcome-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
+  border: 1px solid #e5e7eb;
+}
+
+.welcome-header-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-
-  .messages-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-
-    .message-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-
-      &.user {
-        flex-direction: row-reverse;
-
-        // 用户发送的文件卡片样式
-        .tool-message-content {
-          .file-card {
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            border: none;
-            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
-
-            .file-card-icon {
-              color: white;
-              font-size: 24px;
-            }
-
-            .file-card-info {
-              .file-card-name {
-                color: white;
-              }
-
-              .file-card-hint {
-                color: rgba(255, 255, 255, 0.8);
-              }
-            }
-
-            .file-card-action {
-              color: white;
-              opacity: 0.8;
-            }
-
-            &:hover {
-              background: linear-gradient(135deg, #5558e3 0%, #7c4db8 100%);
-              box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35);
-
-              .file-card-icon {
-                color: white;
-                transform: scale(1.1);
-              }
-
-              .file-card-action {
-                opacity: 1;
-              }
-            }
-          }
-        }
-
-        // 用户发送的图片样式
-        .image-message-content {
-          .message-image {
-            border: 2px solid #6366f1;
-            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
-          }
-        }
-      }
-
-      .message-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 14px;
-        font-weight: 600;
-        flex-shrink: 0;
-        overflow: hidden;
-        
-        &.has-image {
-          background: #f0f0f0;
-          padding: 0;
-          
-          .avatar-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-          }
-        }
-      }
-
-      .message-content {
-        max-width: 70%;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-
-        .message-bubble {
-          padding: 16px;
-          border-radius: 12px;
-          font-size: 14px;
-          line-height: 1.6;
-
-          &.user {
-            background: linear-gradient(135deg, #6366f1, #8b5cf6);
-            color: white;
-            border-bottom-right-radius: 4px;
-          }
-
-          .message-text {
-            font-family: inherit;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-            margin: 0;
-            padding: 0;
-          }
-
-          .attachments {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255, 255, 255, 0.2);
-
-            .attachment-item {
-              font-size: 12px;
-              opacity: 0.9;
-            }
-          }
-        }
-
-        .ai-message-content {
-          font-size: 14px;
-          line-height: 1.6;
-          color: #333;
-
-          .typing {
-            color: #999;
-            font-style: italic;
-          }
-
-          .attachments {
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid #e0e0e0;
-
-            .attachment-item {
-              font-size: 12px;
-              color: #666;
-            }
-          }
-        }
-
-        .message-time {
-          font-size: 12px;
-          color: #999;
-          padding: 0 4px;
-        }
-
-        .tool-message-content {
-          min-width: 0;
-          
-          .file-card {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            padding: 16px 18px;
-            background: linear-gradient(135deg, #f8f9fc 0%, #ffffff 100%);
-            border: 2px solid #e0e7ff;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            max-width: 100%;
-            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
-            position: relative;
-            overflow: hidden;
-
-            &::before {
-              content: '';
-              position: absolute;
-              top: 0;
-              left: -100%;
-              width: 100%;
-              height: 100%;
-              background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-              transition: all 0.5s;
-            }
-
-            &:hover {
-              background: linear-gradient(135deg, #f0f4ff 0%, #e6f0ff 100%);
-              border-color: #6366f1;
-              box-shadow: 0 6px 16px rgba(99, 102, 241, 0.15);
-              transform: translateY(-2px);
-
-              .file-card-icon {
-                transform: scale(1.15);
-                color: #6366f1;
-              }
-
-              .file-card-action {
-                opacity: 1;
-                transform: translateX(4px);
-              }
-
-              &::before {
-                left: 100%;
-              }
-            }
-
-            &:active {
-              transform: translateY(0);
-            }
-
-            .file-card-icon {
-              font-size: 28px;
-              flex-shrink: 0;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              transition: all 0.25s;
-            }
-
-            .file-card-info {
-              flex: 1;
-              min-width: 0;
-              display: flex;
-              flex-direction: column;
-              gap: 4px;
-
-              .file-card-name {
-                font-size: 15px;
-                color: #333;
-                font-weight: 600;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                letter-spacing: 0.3px;
-              }
-
-              .file-card-hint {
-                font-size: 12px;
-                color: #6366f1;
-                font-weight: 500;
-                opacity: 0.8;
-              }
-            }
-
-            .file-card-action {
-              font-size: 18px;
-              font-weight: 600;
-              color: #6366f1;
-              flex-shrink: 0;
-              opacity: 0.4;
-              transition: all 0.25s;
-            }
-          }
-        }
-
-        .image-message-content {
-          min-width: 0;
-          max-width: 100%;
-          
-          .message-image {
-            max-width: 300px;
-            max-height: 300px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            display: block;
-          }
-        }
-
-        .tool-calling-message {
-          min-width: 0;
-          width: 100%;
-          
-          .tool-calling-content {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
-            background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
-            border: 2px solid #fecaca;
-            border-radius: 12px;
-            font-size: 14px;
-            color: #92400e;
-            animation: slideIn 0.3s ease-out;
-
-            .tool-calling-icon {
-              font-size: 18px;
-              flex-shrink: 0;
-              animation: spin 2s linear infinite;
-            }
-
-            .tool-calling-text {
-              flex: 1;
-              font-weight: 500;
-            }
-
-            .tool-calling-spinner {
-              display: flex;
-              gap: 4px;
-              align-items: center;
-              flex-shrink: 0;
-
-              .spinner-dot {
-                width: 6px;
-                height: 6px;
-                background: #fca5a5;
-                border-radius: 50%;
-                animation: bounce 1.4s infinite;
-
-                &:nth-child(2) {
-                  animation-delay: 0.2s;
-                }
-
-                &:nth-child(3) {
-                  animation-delay: 0.4s;
-                }
-              }
-            }
-          }
-        }
-
-        .tool-confirmation-message {
-          min-width: 0;
-          width: 100%;
-          
-          .tool-confirmation-content {
-            padding: 16px;
-            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
-            border: 2px solid #93c5fd;
-            border-radius: 12px;
-            animation: slideIn 0.3s ease-out;
-
-            .confirmation-text {
-              margin-bottom: 16px;
-              font-size: 14px;
-              color: #1e40af;
-              line-height: 1.6;
-
-              :deep(p) {
-                margin: 0;
-              }
-            }
-
-            .confirmation-buttons {
-              display: flex;
-              gap: 12px;
-              justify-content: flex-end;
-
-              .confirmation-btn {
-                padding: 10px 20px;
-                border: none;
-                border-radius: 8px;
-                font-size: 14px;
-                font-weight: 500;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-
-                &.allow-btn {
-                  background: linear-gradient(135deg, #10b981, #059669);
-                  color: white;
-                  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
-
-                  &:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
-                  }
-
-                  &:active {
-                    transform: translateY(0);
-                  }
-                }
-
-                &.deny-btn {
-                  background: linear-gradient(135deg, #ef4444, #dc2626);
-                  color: white;
-                  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.2);
-
-                  &:hover {
-                    transform: translateY(-2px);
-                    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-                  }
-
-                  &:active {
-                    transform: translateY(0);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-
-    .loading-message {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-
-      .message-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #6366f1, #8b5cf6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-size: 14px;
-        flex-shrink: 0;
-        overflow: hidden;
-        
-        &.has-image {
-          background: #f0f0f0;
-          padding: 0;
-          
-          .avatar-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-          }
-        }
-      }
-
-      .message-content {
-        .ai-message-content {
-          font-size: 14px;
-          line-height: 1.6;
-          color: #333;
-
-          .typing {
-            color: #999;
-            font-style: italic;
-          }
-        }
-      }
-    }
-  }
-
-  .input-area {
-    padding: 16px 24px;
-    background: #fff;
-    border-top: 1px solid #e0e0e0;
-
-    .selected-files-preview {
-      margin-bottom: 16px;
-      padding: 12px 16px;
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
-      border-radius: 8px;
-      max-height: 200px;
-      overflow-y: auto;
-
-      .preview-title {
-        font-size: 13px;
-        color: #666;
-        font-weight: 500;
-        margin-bottom: 8px;
-      }
-
-      .files-list {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-
-        .file-preview-item {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          padding: 8px 12px;
-          background: #fff;
-          border: 1px solid #dee2e6;
-          border-radius: 6px;
-          font-size: 13px;
-
-          .file-icon {
-            font-size: 16px;
-            flex-shrink: 0;
-          }
-
-          .file-name {
-            flex: 1;
-            color: #333;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          }
-
-          .file-status {
-            font-size: 12px;
-            color: #6366f1;
-            flex-shrink: 0;
-          }
-
-          .file-remove-btn {
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            color: #999;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.2s;
-            flex-shrink: 0;
-
-            &:hover {
-              background: #fff3cd;
-              border-color: #ffc107;
-              color: #ff6b6b;
-            }
-          }
-
-          &.is-image {
-            flex-direction: column;
-            align-items: flex-start;
-            padding: 8px;
-            gap: 6px;
-          }
-
-          .image-thumbnail {
-            width: 100%;
-            height: 60px;
-            object-fit: cover;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-            flex-shrink: 0;
-          }
-
-          .file-info {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            width: 100%;
-
-            .file-name {
-              flex: 1;
-              color: #333;
-              overflow: hidden;
-              text-overflow: ellipsis;
-              white-space: nowrap;
-              font-size: 12px;
-            }
-
-            .file-status {
-              font-size: 11px;
-              color: #6366f1;
-              flex-shrink: 0;
-            }
-
-            .file-remove-btn {
-              width: 20px;
-              height: 20px;
-              padding: 0;
-              flex-shrink: 0;
-            }
-          }
-        }
-      }
-    }
-
-    .input-wrapper {
-      position: relative;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-      border: 1px solid #e0e0e0;
-
-      textarea {
-        width: 100%;
-        min-height: 80px;
-        padding: 16px;
-        padding-right: 100px;
-        border: none;
-        border-radius: 12px;
-        font-size: 14px;
-        line-height: 1.5;
-        outline: none;
-        resize: vertical;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-      }
-
-      .input-actions {
-        position: absolute;
-        bottom: 12px;
-        right: 16px;
-        display: flex;
-        gap: 8px;
-
-        .upload-btn {
-          width: 36px;
-          height: 36px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #fff;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          font-size: 16px;
-          cursor: pointer;
-
-          &:hover {
-            background: #f5f5f5;
-          }
-        }
-
-        .send-btn {
-          padding: 8px 20px;
-          background: #6366f1;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          font-size: 14px;
-          cursor: pointer;
-          transition: all 0.2s;
-
-          &:hover:not(:disabled) {
-            background: #5558e3;
-          }
-
-          &:disabled {
-            background: #f0f0f0;
-            color: #999;
-            cursor: not-allowed;
-          }
-        }
-      }
-    }
-  }
 }
 
-// 动画定义
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes bounce {
-  0%, 80%, 100% {
-    opacity: 0.6;
-    transform: translateY(0);
-  }
-  40% {
-    opacity: 1;
-    transform: translateY(-8px);
-  }
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-// 充值对话框样式
-.payment-success-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px 0 8px;
-  text-align: center;
-
-  .payment-success-icon {
-    margin-bottom: 16px;
-  }
-
-  .payment-success-title {
-    font-size: 24px;
-    font-weight: 700;
-    color: #15803d;
-    margin-bottom: 12px;
-  }
-
-  .payment-success-order {
-    font-size: 13px;
-    color: #9ca3af;
-    margin-bottom: 8px;
-  }
-
-  .payment-success-tip {
-    font-size: 15px;
-    color: #374151;
-  }
-}
-
-.recharge-dialog-content {
-  padding: 20px 0;
-
-  .recharge-main {
-    display: flex;
-    gap: 24px;
-    margin-bottom: 20px;
-    min-height: 320px;
-
-    .section-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #303133;
-      margin-bottom: 12px;
-      padding-left: 4px;
-    }
-
-    .packages-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-
-      .packages-grid {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 8px;
-        flex: 1;
-        overflow-y: auto;
-        max-height: 300px;
-        padding-right: 8px;
-
-        &::-webkit-scrollbar {
-          width: 6px;
-        }
-
-        &::-webkit-scrollbar-track {
-          background: transparent;
-        }
-
-        &::-webkit-scrollbar-thumb {
-          background: #d9d9d9;
-          border-radius: 3px;
-
-          &:hover {
-            background: #bfbfbf;
-          }
-        }
-
-        .package-card {
-          padding: 12px;
-          border: 2px solid #e8e9eb;
-          border-radius: 6px;
-          cursor: pointer;
-          transition: all 0.3s;
-          position: relative;
-
-          &:hover {
-            border-color: #6366f1;
-            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.15);
-          }
-
-          &.active {
-            border-color: #6366f1;
-            background: rgba(99, 102, 241, 0.08);
-            box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
-
-            .package-amount {
-              color: #6366f1;
-            }
-          }
-
-          .package-amount {
-            font-size: 16px;
-            font-weight: 700;
-            color: #303133;
-            margin-bottom: 4px;
-          }
-
-          .package-description {
-            font-size: 12px;
-            color: #606266;
-            margin-bottom: 6px;
-          }
-
-          .package-benefits {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            margin-bottom: 4px;
-
-            .benefit {
-              font-size: 11px;
-              color: #909399;
-            }
-          }
-
-          .package-discount {
-            position: absolute;
-            top: -1px;
-            right: -1px;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-            color: white;
-            padding: 3px 6px;
-            border-radius: 0 6px;
-            font-size: 11px;
-            font-weight: 600;
-          }
-        }
-      }
-    }
-
-    .divider-vertical {
-      width: 1px;
-      background: #e8e9eb;
-      min-height: 300px;
-    }
-
-    .custom-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-
-      .custom-content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-
-        .custom-input-wrapper {
-          position: relative;
-
-          .custom-input {
-            :deep(.el-input__wrapper) {
-              background-color: #f5f6f7;
-
-              &:hover {
-                background-color: #fff;
-              }
-            }
-          }
-
-          .loading-text {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 12px;
-            color: #909399;
-          }
-        }
-
-        .custom-preview {
-          background: #f5f6f7;
-          border-radius: 6px;
-          padding: 12px;
-          border-left: 3px solid #6366f1;
-          flex: 1;
-          overflow-y: auto;
-
-          .preview-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-            font-size: 13px;
-
-            &:last-child {
-              margin-bottom: 0;
-            }
-
-            .label {
-              color: #606266;
-              font-weight: 500;
-            }
-
-            .value {
-              font-weight: 600;
-
-              &.price {
-                color: #303133;
-                font-size: 14px;
-              }
-
-              &.discount {
-                color: #67c23a;
-              }
-
-              &.benefit-text {
-                color: #6366f1;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  .price-preview {
-    background: #f5f6f7;
-    border-radius: 6px;
-    padding: 12px;
-    border-left: 3px solid #6366f1;
-    margin-top: 16px;
-
-    .preview-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-      font-size: 13px;
-
-      &:last-child {
-        margin-bottom: 0;
-      }
-
-      span:first-child {
-        color: #606266;
-        font-weight: 500;
-      }
-
-      .price {
-        font-weight: 600;
-        color: #303133;
-        font-size: 14px;
-      }
-
-      .discount {
-        color: #67c23a;
-        font-weight: 600;
-      }
-
-      .benefit-text {
-        color: #6366f1;
-        font-weight: 600;
-      }
-    }
-  }
-}
-
-/* 悬浮公告面板样式 */
-.announcement-float-btn {
-  position: fixed;
-  bottom: 120px;
-  right: 24px;
+.welcome-avatar {
   width: 56px;
   height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  border: none;
-  color: #fff;
-  font-size: 24px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-  transition: all 0.3s;
-  z-index: 99;
-}
-
-.announcement-float-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
-}
-
-.announcement-float-btn:active {
-  transform: scale(0.95);
-}
-
-.float-btn-icon {
-  position: relative;
-}
-
-.float-btn-count {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #ff4444;
-  color: #fff;
-  font-size: 12px;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  border: 2px solid #fff;
-}
-
-.announcement-floating-panel {
-  position: fixed;
-  bottom: 90px;
-  right: 24px;
-  width: 320px;
-  max-height: 0;
-  opacity: 0;
-  background: #fff;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 999;
-  display: flex;
-  flex-direction: column;
-}
-
-.announcement-floating-panel.active {
-  max-height: 500px;
-  opacity: 1;
-}
-
-.announcement-panel-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%);
-  flex-shrink: 0;
-}
-
-.panel-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.close-btn {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: transparent;
-  color: #6b7280;
-  font-size: 16px;
-  cursor: pointer;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+  .avatar-image { width: 100%; height: 100%; object-fit: cover; }
+  .avatar-placeholder { font-size: 1.8rem; }
 }
 
-.close-btn:hover {
-  color: #1f2937;
-  background-color: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
-}
-
-.panel-body {
+.welcome-info {
   flex: 1;
-  overflow-y: auto;
-  padding: 0;
-  min-height: 0;
+  min-width: 0;
 }
 
-.no-announcement {
-  padding: 40px 16px;
-  text-align: center;
-  color: #9ca3af;
-  font-size: 13px;
-}
-
-.loading-announcement {
-  padding: 40px 16px;
-  text-align: center;
-  color: #6b7280;
-  font-size: 13px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.spinner {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid #e5e7eb;
-  border-top-color: #6366f1;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.announcements-list {
-  padding: 8px;
-}
-
-.announcement-item {
-  padding: 12px;
-  margin-bottom: 8px;
-  border-radius: 8px;
-  background-color: #f9fafb;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid #e5e7eb;
-  position: relative;
-}
-
-.announcement-item:hover {
-  background-color: #f3f4f6;
-  border-color: #d1d5db;
-}
-
-.announcement-item.active {
-  background-color: #f0f4ff;
-  border-color: #6366f1;
-}
-
-.item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.item-type {
-  display: inline-block;
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 600;
-  width: fit-content;
-}
-
-.item-type.type-maintenance {
-  background-color: #fef3c7;
-  color: #92400e;
-}
-
-.item-type.type-important {
-  background-color: #fee2e2;
-  color: #991b1b;
-}
-
-.item-type.type-feature {
-  background-color: #d1fae5;
-  color: #065f46;
-}
-
-.item-type.type-update {
-  background-color: #dbeafe;
-  color: #0c2d6b;
-}
-
-.item-badge {
-  color: #6366f1;
-  font-size: 12px;
+.welcome-title {
+  font-size: 1.1rem;
   font-weight: 700;
-}
-
-.item-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1f2937;
+  color: $text;
   margin-bottom: 4px;
-  line-height: 1.3;
+  line-height: 1.4;
 }
 
-.item-message {
-  font-size: 12px;
-  color: #4b5563;
-  line-height: 1.4;
-  margin-bottom: 6px;
+.welcome-desc {
+  font-size: 0.85rem;
+  color: $text-muted;
+  line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.item-time {
-  font-size: 11px;
-  color: #9ca3af;
-}
-
-/* 滚动条样式 */
-.panel-body::-webkit-scrollbar {
-  width: 6px;
-}
-
-.panel-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.panel-body::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 3px;
-}
-
-.panel-body::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
-}
-
-/* 教程对话框样式 */
-.tutorial-dialog {
-  :deep(.el-dialog__header) {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 20px 24px;
-    border-bottom: none;
-
-    .el-dialog__title {
-      color: white;
-      font-size: 16px;
-      font-weight: 600;
-    }
-
-    .el-dialog__close {
-      color: white;
-
-      &:hover {
-        background-color: rgba(255, 255, 255, 0.2);
-      }
-    }
+.tutorial-btn-new {
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+  white-space: nowrap;
+  &:hover {
+    background: $primary;
+    border-color: $primary;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    transform: scale(1.05);
   }
+  &:active { transform: scale(0.95); }
+}
 
-  :deep(.el-dialog__body) {
-    padding: 24px;
-    background: #f9fafb;
+.prompts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.prompts-header {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: $text;
+  padding: 0 4px;
+}
+
+.prompts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.prompt-card {
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  &:hover {
+    border-color: $primary;
+    background: #f8f9ff;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+    transform: translateY(-2px);
   }
+  &:active { transform: translateY(0); }
+}
 
-  :deep(.el-dialog__footer) {
-    padding: 16px 24px;
-    background: #f9fafb;
-    border-top: 1px solid #e5e7eb;
+.prompt-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.prompt-text {
+  font-size: 0.85rem;
+  color: $text;
+  font-weight: 500;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.tutorial-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 20px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  cursor: pointer;
+  color: $primary;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: background 0.2s, border-color 0.2s;
+  &:hover { background: #e0e7ff; border-color: $primary; }
+}
+
+.starter-prompts {
+  width: 100%;
+  margin-bottom: 24px;
+  .prompts-label { font-size: 0.85rem; color: $text-muted; margin-bottom: 10px; }
+  .prompts-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .prompt-item {
+    padding: 7px 14px;
+    background: #fff;
+    border: 1px solid $border;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: $text;
+    transition: border-color 0.15s, background 0.15s;
+    &:hover { border-color: $primary; background: #eef2ff; color: $primary; }
   }
 }
 
-.tutorial-dialog-content {
-  max-height: 600px;
+.input-section {
+  width: 100%;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+}
+
+// ── Messages ─────────────────────────────────────────────────────────────
+.chat-messages {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.messages-list {
+  flex: 1;
   overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  &::-webkit-scrollbar { width: 5px; }
+  &::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+}
 
-  .tutorial-loading {
+.message-item {
+  display: flex;
+  gap: 12px;
+  max-width: 820px;
+  &.user { flex-direction: row-reverse; align-self: flex-end; }
+  .message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #eef2ff;
+    color: $primary;
+    font-size: 0.8rem;
+    font-weight: 700;
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 60px 40px;
-    gap: 16px;
-
-    .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid #e5e7eb;
-      border-top: 4px solid #667eea;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-    }
-
-    span {
-      color: #6b7280;
-      font-size: 15px;
-    }
+    flex-shrink: 0;
+    overflow: hidden;
+    &.has-image { background: transparent; }
+    .avatar-img { width: 100%; height: 100%; object-fit: cover; }
   }
+  &.user .message-avatar { background: $primary; color: #fff; }
+  .message-content { flex: 1; min-width: 0; }
+}
 
-  .tutorial-error {
+.message-bubble {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 12px;
+  max-width: 100%;
+  &.user {
+    background: $primary;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+}
+
+.message-text {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  font-family: inherit;
+  color: inherit;
+}
+
+.ai-message-content {
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 12px;
+  border-top-left-radius: 4px;
+  padding: 12px 16px;
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: $text;
+  max-width: 100%;
+  .message-time {
+    font-size: 0.75rem;
+    color: #9ca3af;
+    margin-top: 8px;
+  }
+}
+
+.tool-message-content {
+  .file-card {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 60px 40px;
-    gap: 16px;
-
-    .error-icon {
-      font-size: 48px;
-    }
-
-    .error-message {
-      color: #dc2626;
-      font-size: 14px;
-      text-align: center;
-      max-width: 400px;
-      line-height: 1.6;
-    }
+    gap: 12px;
+    padding: 10px 14px;
+    background: #fff;
+    border: 1px solid $border;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    max-width: 280px;
+    &:hover { border-color: $primary; box-shadow: 0 2px 8px rgba(99,102,241,0.1); }
+    .file-card-icon { font-size: 1.4rem; flex-shrink: 0; }
+    .file-card-info { flex: 1; min-width: 0; }
+    .file-card-name { font-size: 0.875rem; font-weight: 500; color: $text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-card-hint { font-size: 0.75rem; color: $text-muted; }
+    .file-card-action { color: $text-muted; }
+    .action-icon { font-size: 1rem; }
   }
+}
 
-  .tutorial-content {
-    background: white;
+.image-message-content {
+  .message-image { max-width: 320px; border-radius: 8px; display: block; }
+}
+
+.tool-calling-message {
+  .tool-calling-content {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    background: #f3f4f6;
     border-radius: 8px;
-    padding: 24px;
-    line-height: 1.8;
-    color: #333;
+    color: $text-muted;
+    font-size: 0.875rem;
+  }
+  .tool-calling-spinner { display: flex; gap: 3px; }
+  .spinner-dot {
+    width: 5px;
+    height: 5px;
+    background: $primary;
+    border-radius: 50%;
+    animation: dotPulse 1.2s infinite;
+    &:nth-child(2) { animation-delay: 0.2s; }
+    &:nth-child(3) { animation-delay: 0.4s; }
+  }
+}
 
-    :deep(h1) {
-      font-size: 28px;
-      font-weight: 700;
-      margin: 24px 0 16px 0;
-      color: #1f2937;
-      border-bottom: 2px solid #667eea;
-      padding-bottom: 12px;
+.tool-confirmation-message {
+  .tool-confirmation-content {
+    background: #fff;
+    border: 1px solid #fbbf24;
+    border-radius: 10px;
+    padding: 14px 16px;
+    max-width: 480px;
+  }
+  .confirmation-text { font-size: 0.9rem; color: $text; margin-bottom: 12px; }
+  .confirmation-buttons { display: flex; gap: 10px; }
+  .confirmation-btn {
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    transition: background 0.15s;
+  }
+  .allow-btn { background: $primary; color: #fff; &:hover { background: $primary-dark; } }
+  .deny-btn { background: #f3f4f6; color: $text-muted; &:hover { background: #e5e7eb; } }
+}
 
-      &:first-child {
-        margin-top: 0;
-      }
+.loading-message {
+  display: flex;
+  gap: 12px;
+  .message-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #eef2ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    &.has-image { background: transparent; }
+  }
+  .ai-message-content { background: #fff; border: 1px solid $border; border-radius: 12px; border-top-left-radius: 4px; padding: 12px 16px; }
+  .typing { color: $text-muted; font-size: 0.9rem; }
+}
+
+.attachments { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+
+.attachment-item {
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.85);
+  background: rgba(255,255,255,0.15);
+  padding: 3px 8px;
+  border-radius: 4px;
+  .message-item:not(.user) & {
+    color: $text-muted;
+    background: #f3f4f6;
+  }
+}
+
+// ── Input area ─────────────────────────────────────────────────────────────
+.input-area {
+  padding: 12px 20px 16px;
+  background: #fff;
+  border-top: 1px solid $border;
+}
+
+.selected-files-preview {
+  margin-bottom: 8px;
+  .preview-title { font-size: 0.8rem; color: $text-muted; margin-bottom: 6px; }
+  .files-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .file-preview-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #f3f4f6;
+    border: 1px solid $border;
+    border-radius: 6px;
+    padding: 5px 8px;
+    max-width: 200px;
+    &.is-image { background: #fff; }
+    .image-thumbnail { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; }
+    .file-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .file-info {
+      min-width: 0;
+      .file-name { font-size: 0.78rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; color: $text; }
+      .file-status { font-size: 0.75rem; color: $text-muted; }
     }
-
-    :deep(h2) {
-      font-size: 22px;
-      font-weight: 600;
-      margin: 20px 0 12px 0;
-      color: #374151;
-    }
-
-    :deep(h3) {
-      font-size: 18px;
-      font-weight: 600;
-      margin: 16px 0 8px 0;
-      color: #4b5563;
-    }
-
-    :deep(p) {
-      margin: 8px 0;
-      font-size: 14px;
-    }
-
-    :deep(pre) {
-      background: #f3f4f6;
-      border: 1px solid #e5e7eb;
-      border-radius: 6px;
-      padding: 12px 16px;
-      overflow-x: auto;
-      margin: 12px 0;
-
-      code {
-        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        font-size: 13px;
-        color: #1f2937;
-      }
-    }
-
-    :deep(code) {
-      background: #f0f1f3;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-      font-size: 13px;
-      color: #dc2626;
-    }
-
-    :deep(ul),
-    :deep(ol) {
-      margin: 12px 0;
-      padding-left: 24px;
-
-      li {
-        margin: 6px 0;
-      }
-    }
-
-    :deep(blockquote) {
-      border-left: 4px solid #667eea;
-      background: #f0f4ff;
-      padding: 12px 16px;
-      margin: 12px 0;
-      border-radius: 4px;
-      color: #555;
-    }
-
-    :deep(a) {
-      color: #667eea;
-      text-decoration: none;
-
-      &:hover {
-        text-decoration: underline;
-        color: #764ba2;
-      }
-    }
-
-    :deep(img) {
-      max-width: 100%;
-      height: auto;
-      border-radius: 6px;
-      margin: 12px 0;
-      border: 1px solid #e5e7eb;
-    }
-
-    :deep(table) {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 12px 0;
-      border: 1px solid #e5e7eb;
-
-      th {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 12px;
-        text-align: left;
-        font-weight: 600;
-      }
-
-      td {
-        border: 1px solid #e5e7eb;
-        padding: 12px;
-      }
-
-      tr:hover {
-        background: #f9fafb;
-      }
+    .file-remove-btn {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: $text-muted;
+      font-size: 0.7rem;
+      padding: 2px;
+      flex-shrink: 0;
+      border-radius: 3px;
+      &:hover { background: #e5e7eb; color: $text; }
     }
   }
 }
 
-/* 滚动条样式 */
-.tutorial-dialog-content::-webkit-scrollbar {
-  width: 8px;
+.input-wrapper {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  &:focus-within {
+    border-color: $primary;
+    box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
+  }
+  textarea {
+    resize: none;
+    border: none;
+    outline: none;
+    padding: 12px 14px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: $text;
+    min-height: 80px;
+    max-height: 200px;
+    font-family: inherit;
+    background: transparent;
+    &::placeholder { color: #9ca3af; }
+  }
+  .input-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-top: 1px solid $border;
+    background: #fafafa;
+  }
 }
 
-.tutorial-dialog-content::-webkit-scrollbar-track {
-  background: transparent;
+.upload-btn {
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: $text-muted;
+  font-size: 1.1rem;
+  transition: background 0.15s;
+  &:hover { background: #f3f4f6; color: $text; }
 }
 
-.tutorial-dialog-content::-webkit-scrollbar-thumb {
-  background: #d1d5db;
-  border-radius: 4px;
+.send-btn {
+  padding: 7px 20px;
+  background: $primary;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: background 0.2s;
+  &:hover:not(:disabled) { background: $primary-dark; }
+  &:disabled { background: #e5e7eb; color: #9ca3af; cursor: not-allowed; }
 }
 
-.tutorial-dialog-content::-webkit-scrollbar-thumb:hover {
-  background: #9ca3af;
+// ── Dialogs ─────────────────────────────────────────────────────────────────
+:deep(.el-dialog__body) { padding: 16px 20px; }
+:deep(.el-dropdown-menu__item) { font-size: 0.875rem; }
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid $border;
+  border-top-color: $primary;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
 }
+
+// ── Tutorial dialog ─────────────────────────────────────────────────────────
+.tutorial-dialog-content {
+  min-height: 300px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.tutorial-loading, .tutorial-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 12px;
+  color: $text-muted;
+  font-size: 0.9rem;
+  .error-icon { font-size: 2rem; }
+}
+
+.tutorial-content { font-size: 0.9rem; line-height: 1.7; color: $text; }
+
+// ── Animations ─────────────────────────────────────────────────────────────
+@keyframes dotPulse {
+  0%, 100% { transform: scale(0.6); opacity: 0.5; }
+  50% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid $border;
+  border-top-color: $primary;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
 </style>

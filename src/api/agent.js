@@ -49,12 +49,7 @@ export const getPresignedUrl = (data) => {
   })
 }
 
-export const getBillingBalance = () => {
-  return request({
-    url: '/api/billing/balance',
-    method: 'get'
-  })
-}
+
 
 export const getPackages = () => {
   return request({

@@ -2,32 +2,32 @@
   <div>
     <!-- 登录表单 -->
     <el-form v-if="!showReset" :model="loginForm" :rules="loginRules" ref="loginFormRef" label-position="top">
-      <el-form-item :label="t('common.account')" prop="account">
+      <el-form-item label="账户" prop="account">
         <el-input
           v-model="loginForm.account"
-          :placeholder="t('common.account')"
+          placeholder="账户"
           size="large"
           prefix-icon="User"
         />
       </el-form-item>
-      <el-form-item :label="t('common.password')" prop="password">
+      <el-form-item label="密码" prop="password">
         <el-input
           v-model="loginForm.password"
           type="password"
-          :placeholder="t('common.password')"
+          placeholder="密码"
           size="large"
           prefix-icon="Lock"
           show-password
         />
         <div style="text-align: right; margin-top: 8px;">
           <el-link type="primary" :underline="false" @click="showReset = true">
-            {{ t('common.forgotPassword') }}
+            忘记密码
           </el-link>
         </div>
       </el-form-item>
       <el-form-item>
         <el-button type="primary" size="large" style="width: 100%" :loading="loading" @click="handleLogin">
-          {{ t('common.login') }}
+          登录
         </el-button>
       </el-form-item>
     </el-form>
@@ -39,24 +39,24 @@
           <template #icon>
             <span>←</span>
           </template>
-          {{ t('common.backToLogin') }}
+          返回登录
         </el-button>
       </div>
 
-      <el-form-item :label="t('common.email')" prop="email">
+      <el-form-item label="邮箱" prop="email">
         <el-input
           v-model="resetForm.email"
-          :placeholder="t('common.email')"
+          placeholder="邮箱"
           size="large"
           prefix-icon="Message"
         />
       </el-form-item>
 
-      <el-form-item :label="t('common.verifyCode')" prop="email_code">
+      <el-form-item label="验证码" prop="email_code">
         <div class="verify-code-wrapper">
           <el-input
             v-model="resetForm.email_code"
-            :placeholder="t('common.verifyCode')"
+            placeholder="验证码"
             size="large"
             prefix-icon="Key"
           />
@@ -67,27 +67,27 @@
             @click="handleSendResetCode"
             style="width: 140px; margin-left: 10px;"
           >
-            {{ resetCountdown > 0 ? `${resetCountdown}${t('common.resendCode')}` : t('common.sendCode') }}
+            {{ resetCountdown > 0 ? `${resetCountdown}秒后重新发送` : '发送验证码' }}
           </el-button>
         </div>
       </el-form-item>
 
-      <el-form-item :label="t('common.newPassword')" prop="new_password">
+      <el-form-item label="新密码" prop="new_password">
         <el-input
           v-model="resetForm.new_password"
           type="password"
-          :placeholder="t('common.newPassword')"
+          placeholder="新密码"
           size="large"
           prefix-icon="Lock"
           show-password
         />
       </el-form-item>
 
-      <el-form-item :label="t('common.confirmPassword')" prop="confirm_new_password">
+      <el-form-item label="确认密码" prop="confirm_new_password">
         <el-input
           v-model="resetForm.confirm_new_password"
           type="password"
-          :placeholder="t('common.confirmPassword')"
+          placeholder="确认密码"
           size="large"
           prefix-icon="Lock"
           show-password
@@ -96,7 +96,7 @@
 
       <el-form-item>
         <el-button type="primary" size="large" style="width: 100%" :loading="loading" @click="handleResetPassword">
-          {{ t('common.resetPassword') }}
+          重置密码
         </el-button>
       </el-form-item>
     </el-form>
@@ -105,12 +105,9 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { login, sendCode, resetPassword } from '@/api/auth'
-
-const { t } = useI18n()
 const router = useRouter()
 const loginFormRef = ref(null)
 const resetFormRef = ref(null)
@@ -134,7 +131,7 @@ const resetForm = ref({
 
 const validateAccount = (rule, value, callback) => {
   if (!value) {
-    callback(new Error(t('validation.accountRequired')))
+    callback(new Error('请输入账户'))
   } else {
     callback()
   }
@@ -143,9 +140,9 @@ const validateAccount = (rule, value, callback) => {
 const validateEmail = (rule, value, callback) => {
   const emailReg = /^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$/
   if (!value) {
-    callback(new Error(t('validation.emailRequired')))
+    callback(new Error('请输入邮箱'))
   } else if (!emailReg.test(value)) {
-    callback(new Error(t('validation.emailInvalid')))
+    callback(new Error('邮箱格式不正确'))
   } else {
     callback()
   }
@@ -153,7 +150,7 @@ const validateEmail = (rule, value, callback) => {
 
 const validateConfirmPassword = (rule, value, callback) => {
   if (value !== resetForm.value.new_password) {
-    callback(new Error(t('validation.passwordMismatch')))
+    callback(new Error('两次输入的密码不一致'))
   } else {
     callback()
   }
@@ -162,23 +159,23 @@ const validateConfirmPassword = (rule, value, callback) => {
 const loginRules = {
   account: [{ validator: validateAccount, trigger: 'blur' }],
   password: [
-    { required: true, message: t('validation.passwordRequired'), trigger: 'blur' },
-    { min: 6, message: t('validation.passwordMinLength'), trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' }
   ]
 }
 
 const resetRules = {
   email: [{ validator: validateEmail, trigger: 'blur' }],
   email_code: [
-    { required: true, message: t('validation.verifyCodeRequired'), trigger: 'blur' },
-    { len: 6, message: t('validation.verifyCodeLength'), trigger: 'blur' }
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    { len: 6, message: '验证码长度为6位', trigger: 'blur' }
   ],
   new_password: [
-    { required: true, message: t('validation.passwordRequired'), trigger: 'blur' },
-    { min: 6, message: t('validation.passwordMinLength'), trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' }
   ],
   confirm_new_password: [
-    { required: true, message: t('validation.confirmPasswordRequired'), trigger: 'blur' },
+    { required: true, message: '请确认密码', trigger: 'blur' },
     { validator: validateConfirmPassword, trigger: 'blur' }
   ]
 }
@@ -193,14 +190,14 @@ const handleLogin = async () => {
         localStorage.setItem('refresh_token', res.refresh_token)
         localStorage.setItem('token_type', res.token_type)
         localStorage.setItem('nick_name', res.nick_name || '')
-        ElMessage.success(t('message.loginSuccess'))
+        ElMessage.success('登录成功')
         emit('login-success')
       } catch (error) {
         console.error(error)
         if (error.response?.status === 401) {
-          ElMessage.error(t('message.invalidCredentials'))
+          ElMessage.error('账户或密码错误')
         } else {
-          ElMessage.error(t('message.networkError'))
+          ElMessage.error('网络错误')
         }
       } finally {
         loading.value = false
@@ -216,7 +213,7 @@ const handleSendResetCode = async () => {
       mode: 'email',
       purpose: 'reset'
     })
-    ElMessage.success(t('message.sendCodeSuccess'))
+    ElMessage.success('验证码已发送')
     
     resetCountdown.value = 60
     const timer = setInterval(() => {
@@ -227,7 +224,7 @@ const handleSendResetCode = async () => {
     }, 1000)
   } catch (error) {
     console.error(error)
-    ElMessage.error(t('message.networkError'))
+    ElMessage.error('网络错误')
   }
 }
 
@@ -243,7 +240,7 @@ const handleResetPassword = async () => {
           confirm_new_password: resetForm.value.confirm_new_password
         })
         
-        ElMessage.success(t('message.resetPasswordSuccess'))
+        ElMessage.success('密码重置成功')
         // 重置表单并返回登录
         showReset.value = false
         resetForm.value = {
@@ -256,13 +253,13 @@ const handleResetPassword = async () => {
         console.error(error)
         const detail = error.response?.data?.detail
         if (detail && detail.toLowerCase().includes('passwords do not match')) {
-          ElMessage.error(t('message.passwordsDoNotMatch'))
+          ElMessage.error('两次输入的密码不一致')
         } else if (detail && detail.toLowerCase().includes('invalid email verification code')) {
-          ElMessage.error(t('message.invalidVerifyCode'))
+          ElMessage.error('验证码不正确')
         } else if (detail && detail.toLowerCase().includes('email not registered')) {
-          ElMessage.error(t('message.emailNotRegistered'))
+          ElMessage.error('邮箱未注册')
         } else {
-          ElMessage.error(t('message.networkError'))
+          ElMessage.error('网络错误')
         }
       } finally {
         loading.value = false

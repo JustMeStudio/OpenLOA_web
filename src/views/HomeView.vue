@@ -9,12 +9,12 @@
         </div>
         <div class="auth-buttons">
           <template v-if="!isLoggedIn">
-            <el-button type="primary" @click="handleGoLogin">{{ t('common.login') }}</el-button>
+            <el-button type="primary" @click="handleGoLogin">登录</el-button>
           </template>
           <template v-else>
             <div class="user-info-wrapper">
               <span class="user-name">{{ userName }}</span>
-              <el-button type="default" @click="handleLogout">{{ t('common.logout') }}</el-button>
+              <el-button type="default" @click="handleLogout">退出登录</el-button>
             </div>
           </template>
         </div>
@@ -25,9 +25,9 @@
       <section class="agents-section">
         <div class="agents-container">
           <div class="filter-bar" v-if="categories.length > 0">
-            <span class="filter-label">{{ t('common.categories') }}:</span>
+            <span class="filter-label">分类:</span>
             <el-radio-group v-model="selectedCategory" size="large">
-              <el-radio-button :value="''">{{ t('common.allAgents') }}</el-radio-button>
+              <el-radio-button :value="''">全部Agent</el-radio-button>
               <el-radio-button 
                 v-for="category in categories" 
                 :key="category.id" 
@@ -68,12 +68,9 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { queryAllAgentsInfo } from '@/api/agent'
-
-const { t, locale } = useI18n()
 const router = useRouter()
 
 const searchQuery = ref('')
@@ -83,14 +80,9 @@ const pendingAgent = ref(null)
 const categories = ref([])
 const agents = ref([])
 
-const getLanguageCode = (localeValue) => {
-  return localeValue === 'zh-CN' ? 'zh' : 'en'
-}
-
 const fetchAgents = async () => {
   try {
-    const lang = getLanguageCode(locale.value)
-    const res = await queryAllAgentsInfo({ language: lang })
+    const res = await queryAllAgentsInfo({ language: 'zh' })
     if (res && res.success && res.data) {
       agents.value = res.data.map((item, index) => ({
         id: index + 1,
@@ -110,7 +102,7 @@ const fetchAgents = async () => {
   }
 }
 
-watch(locale, () => {
+watch(() => {}, () => {
   fetchAgents()
 })
 
@@ -137,10 +129,6 @@ const filteredAgents = computed(() => {
 })
 
 onMounted(() => {
-  const savedLocale = localStorage.getItem('locale')
-  if (savedLocale) {
-    locale.value = savedLocale
-  }
   fetchAgents()
 })
 
@@ -166,7 +154,7 @@ const handleLogout = () => {
   localStorage.removeItem('refresh_token')
   localStorage.removeItem('token_type')
   localStorage.removeItem('nick_name')
-  ElMessage.success(t('message.logoutSuccess'))
+  ElMessage.success('已退出登录')
   router.push('/auth')
 }
 </script>

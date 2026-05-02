@@ -16,7 +16,7 @@
           </svg>
           <span class="brand-name">OpenLOA</span>
         </div>
-        <p class="brand-tagline">智能 AI Agent 工作平台</p>
+        <p class="brand-tagline">AI Agent Platform</p>
       </div>
       <div class="left-decoration">
         <div class="deco-circle deco-c1"></div>
@@ -27,24 +27,18 @@
 
     <div class="auth-right">
       <div class="auth-card">
-        <div class="auth-lang">
-          <el-select v-model="currentLocale" @change="changeLanguage" placeholder="Language" style="width: 130px">
-            <el-option label="中文 (简体)" value="zh-CN" />
-            <el-option label="English" value="en-US" />
-          </el-select>
-        </div>
 
         <div class="auth-tabs">
           <button
             class="auth-tab"
             :class="{ active: activeTab === 'login' }"
             @click="activeTab = 'login'"
-          >{{ t('common.login') }}</button>
+          >登录</button>
           <button
             class="auth-tab"
             :class="{ active: activeTab === 'register' }"
             @click="activeTab = 'register'"
-          >{{ t('common.register') }}</button>
+          >注册</button>
           <div class="tab-indicator" :class="activeTab"></div>
         </div>
 
@@ -58,30 +52,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import LoginForm from '@/components/auth/LoginForm.vue'
 import RegisterForm from '@/components/auth/RegisterForm.vue'
 
-const { t, locale } = useI18n()
 const router = useRouter()
 const activeTab = ref('login')
-const currentLocale = ref(locale.value)
-
-onMounted(() => {
-  const savedLocale = localStorage.getItem('locale')
-  if (savedLocale) {
-    locale.value = savedLocale
-    currentLocale.value = savedLocale
-  }
-})
-
-const changeLanguage = (lang) => {
-  locale.value = lang
-  currentLocale.value = lang
-  localStorage.setItem('locale', lang)
-}
 
 const handleLoginSuccess = () => {
   router.push('/')

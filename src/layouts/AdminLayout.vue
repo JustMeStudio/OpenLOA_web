@@ -16,21 +16,9 @@
             </div>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="handleProfile">
-                  <el-icon><User /></el-icon>
-                  {{ t('common.profile') }}
-                </el-dropdown-item>
-                <el-dropdown-item @click="handleSettings">
-                  <el-icon><Setting /></el-icon>
-                  {{ t('common.settings') }}
-                </el-dropdown-item>
-                <el-dropdown-item @click="handleAssets">
-                  <el-icon><Wallet /></el-icon>
-                  {{ t('common.assets') }}
-                </el-dropdown-item>
-                <el-dropdown-item divided @click="handleLogout">
+                <el-dropdown-item @click="handleLogout">
                   <el-icon><SwitchButton /></el-icon>
-                  {{ t('common.logout') }}
+                  退出登录
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -50,12 +38,10 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User, Setting, Wallet, SwitchButton, ArrowDown } from '@element-plus/icons-vue'
+import { SwitchButton, ArrowDown } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
-const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -65,18 +51,6 @@ const userAvatar = computed(() => userStore.userInfo.avatar_url)
 
 const goHome = () => {
   router.push('/agent')
-}
-
-const handleProfile = () => {
-  router.push('/app/profile')
-}
-
-const handleSettings = () => {
-  router.push('/app/settings')
-}
-
-const handleAssets = () => {
-  router.push('/app/assets')
 }
 
 // 生命周期钩子：加载用户信息
@@ -100,7 +74,7 @@ const handleLogout = async () => {
     localStorage.removeItem('token_type')
     localStorage.removeItem('nick_name')
     userStore.clearUserInfo()
-    ElMessage.success(t('message.logoutSuccess'))
+    ElMessage.success('已退出登录')
     router.push('/')
   } catch (error) {
     console.log('取消退出')

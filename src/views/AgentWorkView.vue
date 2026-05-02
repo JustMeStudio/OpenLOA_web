@@ -9,12 +9,12 @@
         </div>
         <div class="auth-buttons">
           <template v-if="!isLoggedIn">
-            <el-button type="primary" @click="handleGoLogin">{{ t('common.login') }}</el-button>
+            <el-button type="primary" @click="handleGoLogin">登录</el-button>
           </template>
           <template v-else>
             <div class="user-info-wrapper">
               <span class="user-name">{{ userName }}</span>
-              <el-button type="default" @click="handleLogout">{{ t('common.logout') }}</el-button>
+              <el-button type="default" @click="handleLogout">退出登录</el-button>
             </div>
           </template>
         </div>
@@ -433,7 +433,6 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MarkdownRender } from 'markstream-vue'
 import { Workbook } from 'exceljs'
@@ -441,7 +440,6 @@ import { refreshToken } from '@/api/auth'
 import { queryAllAgentsInfo, getPresignedUrl } from '@/api/agent'
 import { isImageFile, compressImage } from '@/utils/imageCompress'
 
-const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -1794,7 +1792,7 @@ const handleLogout = async () => {
     localStorage.removeItem('refresh_token')
     localStorage.removeItem('token_type')
     localStorage.removeItem('nick_name')
-    ElMessage.success(t('message.logoutSuccess'))
+    ElMessage.success('已退出登录')
     router.push('/')
   } catch (error) {
     console.log('取消退出')

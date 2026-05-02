@@ -1,20 +1,20 @@
 <template>
   <div>
     <el-form :model="registerForm" :rules="registerRules" ref="registerFormRef" label-position="top">
-      <el-form-item :label="t('common.email')" prop="email">
+      <el-form-item label="邮箱" prop="email">
         <el-input
           v-model="registerForm.email"
-          :placeholder="t('common.email')"
+          placeholder="邮箱"
           size="large"
           prefix-icon="Message"
         />
       </el-form-item>
 
-      <el-form-item :label="t('common.verifyCode')" prop="email_code">
+      <el-form-item label="验证码" prop="email_code">
         <div class="verify-code-wrapper">
           <el-input
             v-model="registerForm.email_code"
-            :placeholder="t('common.verifyCode')"
+            placeholder="验证码"
             size="large"
             prefix-icon="Key"
           />
@@ -25,27 +25,27 @@
             @click="handleSendCode"
             style="width: 140px; margin-left: 10px;"
           >
-            {{ countdown > 0 ? `${countdown}${t('common.resendCode')}` : t('common.sendCode') }}
+            {{ countdown > 0 ? `${countdown}秒后重新发送` : '发送验证码' }}
           </el-button>
         </div>
       </el-form-item>
 
-      <el-form-item :label="t('common.password')" prop="password">
+      <el-form-item label="密码" prop="password">
         <el-input
           v-model="registerForm.password"
           type="password"
-          :placeholder="t('common.password')"
+          placeholder="密码"
           size="large"
           prefix-icon="Lock"
           show-password
         />
       </el-form-item>
 
-      <el-form-item :label="t('common.confirmPassword')" prop="confirm_password">
+      <el-form-item label="确认密码" prop="confirm_password">
         <el-input
           v-model="registerForm.confirm_password"
           type="password"
-          :placeholder="t('common.confirmPassword')"
+          placeholder="确认密码"
           size="large"
           prefix-icon="Lock"
           show-password
@@ -54,7 +54,7 @@
 
       <el-form-item>
         <el-button type="primary" size="large" style="width: 100%" :loading="loading" @click="handleRegister">
-          {{ t('common.register') }}
+          注册
         </el-button>
       </el-form-item>
     </el-form>
@@ -63,11 +63,8 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { ElMessage } from 'element-plus'
 import { sendCode, register, login } from '@/api/auth'
-
-const { t, locale } = useI18n()
 const emit = defineEmits(['register-success'])
 const registerFormRef = ref(null)
 const loading = ref(false)
@@ -96,9 +93,9 @@ const getLanguagePref = () => {
 const validateEmail = (rule, value, callback) => {
   const emailReg = /^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$/
   if (!value) {
-    callback(new Error(t('validation.emailRequired')))
+    callback(new Error('请输入邮箱'))
   } else if (!emailReg.test(value)) {
-    callback(new Error(t('validation.emailInvalid')))
+    callback(new Error('邮箱格式不正确'))
   } else {
     callback()
   }
@@ -106,7 +103,7 @@ const validateEmail = (rule, value, callback) => {
 
 const validateConfirmPassword = (rule, value, callback) => {
   if (value !== registerForm.value.password) {
-    callback(new Error(t('validation.passwordMismatch')))
+    callback(new Error('两次输入的密码不一致'))
   } else {
     callback()
   }
@@ -115,15 +112,15 @@ const validateConfirmPassword = (rule, value, callback) => {
 const registerRules = {
   email: [{ validator: validateEmail, trigger: 'blur' }],
   email_code: [
-    { required: true, message: t('validation.verifyCodeRequired'), trigger: 'blur' },
-    { len: 6, message: t('validation.verifyCodeLength'), trigger: 'blur' }
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    { len: 6, message: '验证码长度为6位', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: t('validation.passwordRequired'), trigger: 'blur' },
-    { min: 6, message: t('validation.passwordMinLength'), trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码至少6位', trigger: 'blur' }
   ],
   confirm_password: [
-    { required: true, message: t('validation.confirmPasswordRequired'), trigger: 'blur' },
+    { required: true, message: '请确认密码', trigger: 'blur' },
     { validator: validateConfirmPassword, trigger: 'blur' }
   ]
 }
@@ -134,24 +131,24 @@ const getErrorMessage = (error) => {
   if (detail) {
     const detailLower = detail.toLowerCase()
     if (detailLower.includes('passwords do not match')) {
-      return t('message.passwordsDoNotMatch')
+      return '两次输入的密码不一致'
     }
     if (detailLower.includes('invalid email verification code')) {
-      return t('message.invalidVerifyCode')
+      return '验证码不正确'
     }
     if (detailLower.includes('account already exists')) {
-      return t('message.accountAlreadyExists')
+      return '账户已存在'
     }
   }
   
   if (error.response?.status === 409) {
-    return t('message.emailAlreadyExists')
+    return '邮箱已注册'
   } else if (error.response?.status === 400) {
-    return t('message.invalidVerifyCode')
+    return '验证码不正确'
   } else if (error.response?.status === 401) {
-    return t('message.invalidCredentials')
+    return '账户或密码错误'
   } else {
-    return t('message.registerFailed')
+    return '注册失败'
   }
 }
 
@@ -162,7 +159,7 @@ const handleSendCode = async () => {
       mode: 'email',
       purpose: 'register'
     })
-    ElMessage.success(t('message.sendCodeSuccess'))
+    ElMessage.success('验证码已发送')
     
     countdown.value = 60
     const timer = setInterval(() => {
@@ -175,11 +172,11 @@ const handleSendCode = async () => {
     console.error(error)
     const detail = error.response?.data?.detail
     if (detail && detail.toLowerCase().includes('account already exists')) {
-      ElMessage.error(t('message.accountAlreadyExists'))
+      ElMessage.error('账户已存在')
     } else if (error.response?.status === 409) {
-      ElMessage.error(t('message.emailAlreadyExists'))
+      ElMessage.error('邮箱已注册')
     } else {
-      ElMessage.error(t('message.networkError'))
+      ElMessage.error('网络错误')
     }
   }
 }
@@ -195,7 +192,7 @@ const handleRegister = async () => {
           password: registerForm.value.password,
           confirm_password: registerForm.value.confirm_password,
           timezone: getTimezone(),
-          language_pref: getLanguagePref()
+          language_pref: 'zh'
         }
         
         await register(registerData)
@@ -211,7 +208,7 @@ const handleRegister = async () => {
         localStorage.setItem('token_type', loginRes.token_type)
         localStorage.setItem('nick_name', loginRes.nick_name || '')
         
-        ElMessage.success(t('message.registerSuccess'))
+        ElMessage.success('注册成功')
         emit('register-success')
       } catch (error) {
         console.error(error)

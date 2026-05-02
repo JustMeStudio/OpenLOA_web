@@ -40,31 +40,9 @@ export const updateUserInfo = (data) => {
   })
 }
 
-export const updatePassword = (data) => {
-  return request({
-    url: '/api/account/update_password',
-    method: 'post',
-    data
-  })
-}
-
 export const getProfile = () => {
   return request({
     url: '/api/account/profile',
-    method: 'get'
-  })
-}
-
-export const getSettings = () => {
-  return request({
-    url: '/api/account/settings',
-    method: 'get'
-  })
-}
-
-export const getAssets = () => {
-  return request({
-    url: '/api/account/assets',
     method: 'get'
   })
 }

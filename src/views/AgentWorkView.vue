@@ -92,14 +92,7 @@
                     <div class="welcome-desc">{{ agentDescription }}</div>
                   </div>
                 </div>
-                <button 
-                  class="tutorial-btn-new"
-                  @click="handleOpenTutorial"
-                  :loading="tutorialLoading"
-                >
-                  <span class="tutorial-icon">📗</span>
-                  <span>使用教程</span>
-                </button>
+
               </div>
 
               <!-- Suggested Questions Grid -->
@@ -400,31 +393,7 @@
       </template>
     </el-dialog>
 
-    <!-- 使用教程弹窗 -->
-    <el-dialog
-      v-model="showTutorialDialog"
-      :title="`${agentNickName} - 使用教程`"
-      width="90%"
-      :close-on-click-modal="false"
-      class="tutorial-dialog"
-    >
-      <div class="tutorial-dialog-content">
-        <div v-if="tutorialLoading" class="tutorial-loading">
-          <div class="loading-spinner"></div>
-          <span>加载教程中...</span>
-        </div>
-        <div v-else-if="tutorialError" class="tutorial-error">
-          <div class="error-icon">⚠️</div>
-          <div class="error-message">{{ tutorialError }}</div>
-        </div>
-        <div v-else class="tutorial-content">
-          <MarkdownRender :content="tutorialContent" :show-tooltips="false" />
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="showTutorialDialog = false">关闭</el-button>
-      </template>
-    </el-dialog>
+
 
 
   </div>
@@ -450,11 +419,6 @@ const agentDescription = ref('')
 const starterPrompts = ref([])
 const userName = computed(() => localStorage.getItem('nick_name') || '用户')
 const isLoggedIn = computed(() => !!localStorage.getItem('access_token'))
-// 教程相关
-const showTutorialDialog = ref(false)
-const tutorialContent = ref('')
-const tutorialLoading = ref(false)
-const tutorialError = ref('')
 
 const messages = ref([])
 const inputMessage = ref('')
@@ -1799,10 +1763,6 @@ const handleLogout = async () => {
   }
 }
 
-const getLanguageCode = (localeValue) => {
-  return localeValue === 'zh-CN' ? 'zh' : 'en'
-}
-
 onMounted(async () => {
   // Strip `title` attributes from rendered markdown links to prevent the browser
   // from showing the raw URL as a native tooltip on hover.
@@ -1824,19 +1784,32 @@ onMounted(async () => {
   }
   
   try {
-    const lang = getLanguageCode(locale.value)
-    const res = await queryAllAgentsInfo({ agent_name: name, language: lang })
-    if (res && res.success && res.data && Array.isArray(res.data) && res.data.length > 0) {
+    const res = await queryAllAgentsInfo({ agent_name: name, language: 'zh' })
+    console.log('[DEBUG] Agent info response:', res)
+    
+    // 后端返回格式: { success: true, data: [{...}] }
+    if (res?.data && Array.isArray(res.data) && res.data.length > 0) {
       const agentData = res.data[0]
+      console.log('[DEBUG] Selected agent data:', agentData)
+      console.log('[DEBUG] Starter prompts from API:', agentData.starter_prompts)
+      
       agentNickName.value = agentData.nick_name || name
       agentAvatar.value = agentData.avatar || ''
       agentDescription.value = agentData.description || '我是你的AI助手，有什么可以帮到你的？'
-      starterPrompts.value = agentData.starter_prompts || []
+      starterPrompts.value = Array.isArray(agentData.starter_prompts) ? agentData.starter_prompts : []
+      
+      console.log('[DEBUG] Final starter prompts set to:', starterPrompts.value)
+    } else {
+      console.warn('[DEBUG] API returned no agent data. Response:', res)
+      agentNickName.value = name
+      agentDescription.value = '我是你的AI助手，有什么可以帮到你的？'
+      starterPrompts.value = []
     }
   } catch (error) {
     console.error('Failed to fetch agent info:', error)
     agentNickName.value = name
     agentDescription.value = '我是你的AI助手，有什么可以帮到你的？'
+    starterPrompts.value = []
   }
   
   // 获取用户信息（包括头像）
@@ -1886,36 +1859,7 @@ const handleStarterPromptClick = (prompt) => {
   handleSendMessage()
 }
 
-// 处理打开教程
-const handleOpenTutorial = async () => {
-  showTutorialDialog.value = true
-  tutorialLoading.value = true
-  tutorialError.value = ''
-  tutorialContent.value = ''
 
-  try {
-    const language = getLanguageCode(locale.value)
-    const response = await fetchWithTokenRefresh(`/api/information/guidance?agent_name=${encodeURIComponent(agentName.value)}&language=${language}`)
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-    }
-
-    const data = await response.json()
-    
-    if (data.status === 'success' && data.data) {
-      tutorialContent.value = data.data
-    } else {
-      tutorialError.value = data.detail || '无法加载教程内容'
-    }
-  } catch (error) {
-    console.error('加载教程失败:', error)
-    tutorialError.value = `加载教程失败: ${error.message}`
-    ElMessage.error(tutorialError.value)
-  } finally {
-    tutorialLoading.value = false
-  }
-}
 
 </script>
 

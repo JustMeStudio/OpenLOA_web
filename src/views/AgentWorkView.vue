@@ -214,21 +214,28 @@
                         v-else-if="message.type === 'tool'"
                         class="tool-message-content"
                       >
-                        <div 
+                        <button
                           class="file-card"
+                          type="button"
                           @click="handleToolFileClick(message)"
                         >
-                          <div class="file-card-icon">
-                            <span>{{ getFileIcon(message.fileName) }}</span>
+                          <div class="file-card-accent"></div>
+                          <div class="file-card-icon-shell">
+                            <div class="file-card-icon">
+                              <span>{{ getFileIcon(message.fileName) }}</span>
+                            </div>
+                            <span class="file-card-ext">{{ getFileType(message.fileName || 'file').toUpperCase() }}</span>
                           </div>
                           <div class="file-card-info">
+                            <div class="file-card-eyebrow">文件附件</div>
                             <div class="file-card-name">{{ message.fileName || '文件' }}</div>
-                            <div class="file-card-hint">点击查看</div>
+                            <div class="file-card-hint">点击后在新标签页打开</div>
                           </div>
                           <div class="file-card-action">
-                            <span class="action-icon">→</span>
+                            <span class="action-label">Open</span>
+                            <span class="action-icon">↗</span>
                           </div>
-                        </div>
+                        </button>
                       </div>
                       <div 
                         v-else-if="message.type === 'image'"
@@ -720,11 +727,7 @@ const parseFileAttachmentsToMessages = ({
 
 const handleToolFileClick = (message) => {
   if (message.fileUrl) {
-    handleResultFile({
-      url: message.fileUrl,
-      name: message.fileName,
-      file_name: message.fileName
-    })
+    window.open(message.fileUrl, '_blank', 'noopener,noreferrer')
   }
 }
 
@@ -1614,15 +1617,6 @@ const handleSendMessage = async () => {
 
                     attachmentMessages.forEach((attachmentMessage) => {
                       messages.value = [...messages.value, attachmentMessage]
-
-                      if (attachmentMessage.type === 'tool') {
-                        console.log('提取的 fileUrl:', attachmentMessage.fileUrl)
-                        handleResultFile({
-                          url: attachmentMessage.fileUrl,
-                          name: attachmentMessage.fileName,
-                          file_name: attachmentMessage.fileName
-                        })
-                      }
                     })
                   } else {
                     console.log('contentData 中没有 file_attachment 字段')
@@ -2644,23 +2638,121 @@ $header-h: 56px;
 
 .tool-message-content {
   .file-card {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    background: #fff;
-    border: 1px solid $border;
-    border-radius: 10px;
+    gap: 14px;
+    width: min(100%, 360px);
+    padding: 14px 16px 14px 18px;
+    background: linear-gradient(135deg, #fffdf8 0%, #fff 54%, #f7fbff 100%);
+    border: 1px solid rgba(17, 24, 39, 0.08);
+    border-radius: 18px;
     cursor: pointer;
-    transition: border-color 0.15s, box-shadow 0.15s;
-    max-width: 280px;
-    &:hover { border-color: $primary; box-shadow: 0 2px 8px rgba(99,102,241,0.1); }
-    .file-card-icon { font-size: 1.4rem; flex-shrink: 0; }
+    text-align: left;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+
+    &:hover {
+      border-color: rgba(79, 70, 229, 0.28);
+      box-shadow: 0 18px 38px rgba(79, 70, 229, 0.14);
+      transform: translateY(-2px);
+    }
+
+    &:focus-visible {
+      outline: none;
+      border-color: rgba(79, 70, 229, 0.48);
+      box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.14);
+    }
+
+    .file-card-accent {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: linear-gradient(180deg, #0f766e 0%, #4f46e5 100%);
+    }
+
+    .file-card-icon-shell {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #fef3c7 0%, #e0f2fe 100%);
+      flex-shrink: 0;
+    }
+
+    .file-card-icon {
+      font-size: 1.45rem;
+      line-height: 1;
+    }
+
+    .file-card-ext {
+      position: absolute;
+      right: -6px;
+      bottom: -6px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: #111827;
+      color: #fff;
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      box-shadow: 0 8px 18px rgba(17, 24, 39, 0.18);
+    }
+
     .file-card-info { flex: 1; min-width: 0; }
-    .file-card-name { font-size: 0.875rem; font-weight: 500; color: $text; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .file-card-hint { font-size: 0.75rem; color: $text-muted; }
-    .file-card-action { color: $text-muted; }
-    .action-icon { font-size: 1rem; }
+
+    .file-card-eyebrow {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #0f766e;
+    }
+
+    .file-card-name {
+      margin-top: 4px;
+      font-size: 0.94rem;
+      font-weight: 700;
+      color: $text;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-card-hint {
+      margin-top: 6px;
+      font-size: 0.76rem;
+      color: $text-muted;
+    }
+
+    .file-card-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      align-self: stretch;
+      padding: 0 12px;
+      border-radius: 999px;
+      background: #111827;
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .action-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .action-icon {
+      font-size: 0.95rem;
+      line-height: 1;
+    }
   }
 }
 

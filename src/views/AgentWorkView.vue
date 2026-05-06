@@ -178,7 +178,7 @@
                   :key="message.id"
                 >
                   <div 
-                    v-if="message.type === 'user' || message.type === 'tool' || message.type === 'image' || (message.content && message.content.trim() !== '')"
+                    v-if="message.type === 'user' || message.type === 'tool' || message.type === 'image' || message.type === 'chart' || (message.content && message.content.trim() !== '')"
                     class="message-item"
                     :class="[message.type, message.role === 'user' ? 'user' : '']"
                   >
@@ -240,6 +240,26 @@
                           class="message-image"
                           @load="scrollToBottom"
                         />
+                      </div>
+                      <div 
+                        v-else-if="message.type === 'chart'"
+                        class="chart-message-content"
+                      >
+                        <div class="chart-card">
+                          <div class="chart-card-header">
+                            <div>
+                              <div class="chart-card-title">{{ message.title }}</div>
+                              <div class="chart-card-subtitle">{{ getChartTypeLabel(message.chartType) }}</div>
+                            </div>
+                            <span class="chart-card-badge">图表</span>
+                          </div>
+                          <div class="chart-canvas-wrapper">
+                            <canvas :ref="(element) => setChartCanvasRef(message.id, element)"></canvas>
+                          </div>
+                          <div class="message-time">
+                            {{ message.timestamp }}
+                          </div>
+                        </div>
                       </div>
                       <div 
                         v-else-if="message.type === 'tool-calling'"
@@ -400,12 +420,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MarkdownRender } from 'markstream-vue'
+import Chart from 'chart.js/auto'
 import { Workbook } from 'exceljs'
-import { refreshToken } from '@/api/auth'
+import { refreshToken, getProfile } from '@/api/auth'
 import { queryAllAgentsInfo, getPresignedUrl } from '@/api/agent'
 import { isImageFile, compressImage } from '@/utils/imageCompress'
 
@@ -417,6 +438,7 @@ const agentNickName = ref('')
 const agentAvatar = ref('')
 const agentDescription = ref('')
 const starterPrompts = ref([])
+const userAvatar = ref('')
 const userName = computed(() => localStorage.getItem('nick_name') || '用户')
 const isLoggedIn = computed(() => !!localStorage.getItem('access_token'))
 
@@ -429,6 +451,272 @@ const messagesListRef = ref(null)
 const selectedResultFile = ref(null)
 const isGenerating = ref(false)  // 用于标记是否正在生成
 const chatAbortController = ref(null)  // 用于中断stream请求
+
+const chartCanvasRefs = new Map()
+const chartInstances = new Map()
+const supportedChartTypes = new Set(['bar', 'line', 'pie'])
+const chartPalette = ['#4f46e5', '#0f766e', '#ea580c', '#0891b2', '#dc2626', '#7c3aed', '#ca8a04', '#2563eb']
+
+const getChartTypeLabel = (chartType) => {
+  const labelMap = {
+    bar: '柱状图',
+    line: '折线图',
+    pie: '饼图'
+  }
+
+  return labelMap[chartType] || '图表'
+}
+
+const hexToRgba = (hex, alpha) => {
+  const normalizedHex = hex.replace('#', '')
+  const value = normalizedHex.length === 3
+    ? normalizedHex.split('').map(char => char + char).join('')
+    : normalizedHex
+
+  const red = parseInt(value.slice(0, 2), 16)
+  const green = parseInt(value.slice(2, 4), 16)
+  const blue = parseInt(value.slice(4, 6), 16)
+
+  return `rgba(${red}, ${green}, ${blue}, ${alpha})`
+}
+
+const getChartColors = (count) => {
+  return Array.from({ length: count }, (_, index) => chartPalette[index % chartPalette.length])
+}
+
+const normalizeChartData = (chartType, title, rawData = {}) => {
+  const labels = Array.isArray(rawData.labels) ? rawData.labels : []
+
+  if (chartType === 'pie') {
+    const values = Array.isArray(rawData.values)
+      ? rawData.values
+      : Array.isArray(rawData.datasets?.[0]?.data)
+        ? rawData.datasets[0].data
+        : []
+    const colors = getChartColors(values.length)
+
+    return {
+      labels,
+      datasets: [{
+        label: title || '数据',
+        data: values,
+        backgroundColor: colors,
+        borderColor: '#ffffff',
+        borderWidth: 2,
+        hoverOffset: 8
+      }]
+    }
+  }
+
+  const datasets = Array.isArray(rawData.datasets) ? rawData.datasets : []
+
+  return {
+    labels,
+    datasets: datasets.map((dataset, index) => {
+      const color = chartPalette[index % chartPalette.length]
+
+      return {
+        ...dataset,
+        borderColor: dataset.borderColor || color,
+        backgroundColor: dataset.backgroundColor || (chartType === 'line' ? hexToRgba(color, 0.12) : hexToRgba(color, 0.82)),
+        pointBackgroundColor: dataset.pointBackgroundColor || color,
+        pointBorderColor: dataset.pointBorderColor || '#ffffff',
+        pointRadius: chartType === 'line' ? 3 : undefined,
+        tension: chartType === 'line' ? 0.32 : undefined,
+        fill: chartType === 'line' ? false : dataset.fill
+      }
+    })
+  }
+}
+
+const createChartMessage = (payload, timestamp, role = 'system_push') => {
+  if (!payload || payload.action !== 'render_chart') {
+    return null
+  }
+
+  const chartType = payload.chart_type
+  const chartData = payload.data
+
+  if (!supportedChartTypes.has(chartType) || !chartData || !Array.isArray(chartData.labels)) {
+    console.warn('收到无法渲染的图表消息:', payload)
+    return null
+  }
+
+  if (chartType === 'pie') {
+    const pieValues = Array.isArray(chartData.values)
+      ? chartData.values
+      : chartData.datasets?.[0]?.data
+
+    if (!Array.isArray(pieValues)) {
+      console.warn('饼图数据格式无效:', payload)
+      return null
+    }
+  } else if (!Array.isArray(chartData.datasets)) {
+    console.warn('图表 datasets 格式无效:', payload)
+    return null
+  }
+
+  return {
+    id: `chart-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    type: 'chart',
+    role,
+    chartType,
+    title: payload.title || '图表',
+    chartData,
+    timestamp
+  }
+}
+
+const destroyChartInstance = (messageId) => {
+  const chartInstance = chartInstances.get(messageId)
+  if (chartInstance) {
+    chartInstance.destroy()
+    chartInstances.delete(messageId)
+  }
+}
+
+const renderChartMessage = (messageId) => {
+  const canvas = chartCanvasRefs.get(messageId)
+  const message = messages.value.find(item => item.id === messageId && item.type === 'chart')
+
+  if (!canvas || !message) {
+    return
+  }
+
+  destroyChartInstance(messageId)
+
+  const normalizedData = normalizeChartData(message.chartType, message.title, message.chartData)
+  const shouldShowLegend = message.chartType === 'pie' || normalizedData.datasets.length > 1
+
+  chartInstances.set(messageId, new Chart(canvas, {
+    type: message.chartType,
+    data: normalizedData,
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {
+        duration: 450,
+        easing: 'easeOutQuart'
+      },
+      plugins: {
+        legend: {
+          display: shouldShowLegend,
+          position: 'bottom',
+          labels: {
+            color: '#4b5563',
+            usePointStyle: true,
+            boxWidth: 10,
+            padding: 16
+          }
+        },
+        title: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: 'rgba(17, 24, 39, 0.92)',
+          titleColor: '#ffffff',
+          bodyColor: '#e5e7eb',
+          padding: 12,
+          cornerRadius: 10
+        }
+      },
+      scales: message.chartType === 'pie'
+        ? undefined
+        : {
+            x: {
+              ticks: {
+                color: '#6b7280',
+                maxRotation: 0,
+                autoSkipPadding: 12
+              },
+              grid: {
+                display: false
+              }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: {
+                color: '#6b7280'
+              },
+              grid: {
+                color: '#e5e7eb'
+              }
+            }
+          }
+    }
+  }))
+}
+
+const setChartCanvasRef = (messageId, element) => {
+  if (element) {
+    chartCanvasRefs.set(messageId, element)
+    nextTick(() => renderChartMessage(messageId))
+    return
+  }
+
+  chartCanvasRefs.delete(messageId)
+  destroyChartInstance(messageId)
+}
+
+const appendChartMessage = (payload, timestamp) => {
+  const chartMessage = createChartMessage(payload, timestamp)
+
+  if (!chartMessage) {
+    return false
+  }
+
+  messages.value = [...messages.value, chartMessage]
+  nextTick(() => renderChartMessage(chartMessage.id))
+  scrollToBottom()
+  return true
+}
+
+const parseFileAttachmentsToMessages = ({
+  fileAttachment,
+  timestamp,
+  role = 'tool',
+  skipImageUrls = false,
+  startId = Date.now()
+}) => {
+  const attachments = Array.isArray(fileAttachment) ? fileAttachment : [fileAttachment]
+  const parsedMessages = []
+  let messageId = startId
+
+  attachments.forEach((attachment) => {
+    if (attachment && typeof attachment === 'object' && !Array.isArray(attachment)) {
+      const chartMessage = createChartMessage(attachment, timestamp, role)
+      if (chartMessage) {
+        parsedMessages.push({
+          ...chartMessage,
+          id: `chart-${messageId++}`
+        })
+      }
+      return
+    }
+
+    if (typeof attachment !== 'string') {
+      return
+    }
+
+    const fileUrl = attachment.trim().replace(/`/g, '')
+    const fileName = fileUrl.split('/').pop() || '文件'
+
+    if (skipImageUrls && isImageFileName(fileName)) {
+      return
+    }
+
+    parsedMessages.push({
+      id: messageId++,
+      type: 'tool',
+      role,
+      fileName,
+      fileUrl,
+      timestamp
+    })
+  })
+
+  return parsedMessages
+}
 
 const handleToolFileClick = (message) => {
   if (message.fileUrl) {
@@ -893,30 +1181,16 @@ const parseNewFormatContent = (msg, baseTimestamp) => {
         try {
           const textValue = JSON.parse(item.text)
           if (textValue && textValue.file_attachment) {
-            // 有file_attachment，支持单个URL或URL列表
-            const fileAttachments = Array.isArray(textValue.file_attachment)
-              ? textValue.file_attachment
-              : [textValue.file_attachment]
-            
-            // 为每个file_attachment创建独立的消息
-            fileAttachments.forEach(fileAttachment => {
-              let fileUrl = fileAttachment
-              if (typeof fileUrl === 'string') {
-                fileUrl = fileUrl.trim().replace(/`/g, '')
-              }
-              const fileName = fileUrl.split('/').pop() || '文件'
-              // 如果是图片文件，跳过（因为已经通过image_url展示过了）
-              if (!isImageFileName(fileName)) {
-                parsedMessages.push({
-                  id: messageId++,
-                  type: 'tool',
-                  role: msg.role,
-                  fileName: fileName,
-                  fileUrl: fileUrl,
-                  timestamp: baseTimestamp
-                })
-              }
+            const attachmentMessages = parseFileAttachmentsToMessages({
+              fileAttachment: textValue.file_attachment,
+              timestamp: baseTimestamp,
+              role: msg.role,
+              skipImageUrls: true,
+              startId: messageId
             })
+
+            parsedMessages.push(...attachmentMessages)
+            messageId += attachmentMessages.length
           } else {
             // 没有file_attachment，作为普通文本（跳过空文本，避免空气泡）
             if (item.text && item.text.trim()) {
@@ -965,6 +1239,11 @@ const parseSystemPushMessage = (msg, baseTimestamp) => {
   
   try {
     const contentData = JSON.parse(msg.content)
+
+    const chartMessage = createChartMessage(contentData, baseTimestamp, msg.role || 'system_push')
+    if (chartMessage) {
+      return [chartMessage]
+    }
     
     // 检查是否是system_push格式
     if (contentData.role !== 'system_push') {
@@ -1037,25 +1316,11 @@ const fetchConversationMessages = async (conversationId) => {
                 const contentData = JSON.parse(msg.content)
                 console.log('解析后的 contentData:', contentData)
                 if (contentData.file_attachment) {
-                  const fileAttachments = Array.isArray(contentData.file_attachment)
-                    ? contentData.file_attachment
-                    : [contentData.file_attachment]
-                  
-                  // 支持单个URL或URL列表，返回多条独立消息
-                  const toolMessages = fileAttachments.map((fileAttachment, idx) => {
-                    let fileUrl = fileAttachment
-                    if (typeof fileUrl === 'string') {
-                      fileUrl = fileUrl.trim().replace(/`/g, '')
-                    }
-                    const fileName = fileUrl.split('/').pop() || '文件'
-                    console.log('提取的 fileUrl:', fileUrl)
-                    return {
-                      id: index + idx,
-                      type: 'tool',
-                      fileName: fileName,
-                      fileUrl: fileUrl,
-                      timestamp: baseTimestamp
-                    }
+                  const toolMessages = parseFileAttachmentsToMessages({
+                    fileAttachment: contentData.file_attachment,
+                    timestamp: baseTimestamp,
+                    role: 'tool',
+                    startId: Date.now() + index
                   })
                   return toolMessages
                 } else {
@@ -1225,6 +1490,14 @@ const handleSendMessage = async () => {
               fetchConversationHistory()
             }
 
+            if (data.action === 'render_chart') {
+              messages.value = messages.value.filter(msg => !msg.isToolCalling)
+              shouldUpdateCurrentMessage = false
+              hasShownToolCalling = false
+              appendChartMessage(data, new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+              continue
+            }
+
             if (data.role === 'assistant' && data.tool_calls && data.tool_calls.length > 0 && !hasShownToolCalling) {
               // 当assistant消息中有tool_calls时，添加工具调用中的临时消息
               // 使用hasShownToolCalling标志确保只显示一次，避免重复
@@ -1331,34 +1604,25 @@ const handleSendMessage = async () => {
                   const contentData = JSON.parse(data.content)
                   console.log('解析后的 contentData:', contentData)
                   if (contentData.file_attachment) {
-                    const fileAttachments = Array.isArray(contentData.file_attachment) 
-                      ? contentData.file_attachment 
-                      : [contentData.file_attachment]
-                    
-                    // 遍历处理所有file_attachment（支持单个URL或URL列表）
-                    fileAttachments.forEach((fileAttachment, index) => {
-                      let fileUrl = fileAttachment
-                      if (typeof fileUrl === 'string') {
-                        fileUrl = fileUrl.trim().replace(/`/g, '')
+                    const attachmentTimestamp = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    const attachmentMessages = parseFileAttachmentsToMessages({
+                      fileAttachment: contentData.file_attachment,
+                      timestamp: attachmentTimestamp,
+                      role: 'tool',
+                      startId: Date.now() + 2
+                    })
+
+                    attachmentMessages.forEach((attachmentMessage) => {
+                      messages.value = [...messages.value, attachmentMessage]
+
+                      if (attachmentMessage.type === 'tool') {
+                        console.log('提取的 fileUrl:', attachmentMessage.fileUrl)
+                        handleResultFile({
+                          url: attachmentMessage.fileUrl,
+                          name: attachmentMessage.fileName,
+                          file_name: attachmentMessage.fileName
+                        })
                       }
-                      console.log('提取的 fileUrl:', fileUrl)
-                      const fileName = fileUrl.split('/').pop() || '文件'
-                      
-                      // 添加文件卡片消息（使用不同的ID避免重复）
-                      toolMessageId = Date.now() + 2 + index
-                      const toolMessage = {
-                        id: toolMessageId,
-                        type: 'tool',
-                        fileName: fileName,
-                        fileUrl: fileUrl,
-                        timestamp: new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                      }
-                      messages.value = [...messages.value, toolMessage]
-                      handleResultFile({
-                        url: fileUrl,
-                        name: fileName,
-                        file_name: fileName
-                      })
                     })
                   } else {
                     console.log('contentData 中没有 file_attachment 字段')
@@ -1450,7 +1714,7 @@ const handleSendMessage = async () => {
       }
     }
 
-    messages.value = messages.value.filter(msg => msg.type === 'tool' || msg.type === 'image' || (msg.content && msg.content.trim() !== ''))
+    messages.value = messages.value.filter(msg => msg.type === 'tool' || msg.type === 'image' || msg.type === 'chart' || (msg.content && msg.content.trim() !== ''))
 
     // 检查fullContent是否是新格式JSON，如果是则重新解析
     if (fullContent && fullContent.trim().startsWith('[')) {
@@ -1824,6 +2088,12 @@ onMounted(async () => {
   }
   
   fetchConversationHistory()
+})
+
+onBeforeUnmount(() => {
+  chartInstances.forEach(chart => chart.destroy())
+  chartInstances.clear()
+  chartCanvasRefs.clear()
 })
 
 // 监听路由变化，确保每次回到 /agent 时都加载 conversation 历史和用户信息
@@ -2396,6 +2666,60 @@ $header-h: 56px;
 
 .image-message-content {
   .message-image { max-width: 320px; border-radius: 8px; display: block; }
+}
+
+.chart-message-content {
+  width: min(100%, 720px);
+
+  .chart-card {
+    background: #fff;
+    border: 1px solid $border;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  }
+
+  .chart-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .chart-card-title {
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: $text;
+    line-height: 1.45;
+  }
+
+  .chart-card-subtitle {
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: $text-muted;
+  }
+
+  .chart-card-badge {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: $primary-dark;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .chart-canvas-wrapper {
+    position: relative;
+    height: 320px;
+  }
+
+  .message-time {
+    margin-top: 12px;
+    font-size: 0.75rem;
+    color: #9ca3af;
+  }
 }
 
 .tool-calling-message {

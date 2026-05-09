@@ -14,9 +14,9 @@
             <path d="M14 20 L14 10 Q17 7 20 10 L20 30 Q23 33 26 30 L26 14" stroke="url(#aLogoGrad)" stroke-width="2.5" stroke-linecap="round" fill="none"/>
             <path d="M26 14 L32 14" stroke="url(#aLogoGrad)" stroke-width="2.5" stroke-linecap="round"/>
           </svg>
-          <span class="brand-name">OpenLOA</span>
+          <span class="brand-name">湖北机场集团</span>
         </div>
-        <p class="brand-tagline">AI Agent Platform</p>
+        <p class="brand-tagline">AI智能体平台</p>
       </div>
       <div class="left-decoration">
         <div class="deco-circle deco-c1"></div>

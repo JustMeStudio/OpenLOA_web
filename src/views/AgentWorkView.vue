@@ -3038,8 +3038,6 @@ $header-h: 56px;
     font-size: 0.8rem;
     font-family: 'Monaco', 'Courier New', monospace;
     color: $text-muted;
-    max-height: 120px;
-    overflow-y: auto;
     word-break: break-all;
     white-space: pre-wrap;
   }

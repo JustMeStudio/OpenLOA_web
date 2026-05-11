@@ -178,7 +178,7 @@
                   :key="message.id"
                 >
                   <div 
-                    v-if="message.type === 'user' || message.type === 'tool' || message.type === 'image' || message.type === 'chart' || (message.content && message.content.trim() !== '')"
+                    v-if="message.type === 'user' || message.type === 'tool' || message.type === 'image' || message.type === 'chart' || message.type === 'sql_result' || (message.content && message.content.trim() !== '')"
                     class="message-item"
                     :class="[message.type, message.role === 'user' ? 'user' : '']"
                   >
@@ -263,6 +263,77 @@
                           <div class="chart-canvas-wrapper">
                             <canvas :ref="(element) => setChartCanvasRef(message.id, element)"></canvas>
                           </div>
+                          <div class="message-time">
+                            {{ message.timestamp }}
+                          </div>
+                        </div>
+                      </div>
+                      <div 
+                        v-else-if="message.type === 'sql_result'"
+                        class="sql-result-message-content"
+                      >
+                        <div class="sql-result-card">
+                          <div class="sql-result-header">
+                            <div class="sql-result-title">
+                              <span class="sql-result-icon">📊</span>
+                              <span>SQL 查询结果</span>
+                            </div>
+                            <span v-if="message.result === 'success'" class="sql-result-badge success">成功</span>
+                            <span v-else class="sql-result-badge error">失败</span>
+                          </div>
+                          
+                          <div v-if="message.result === 'success'" class="sql-result-body">
+                            <div class="sql-timing-info">
+                              <div class="timing-item">
+                                <span class="timing-label">SQL 生成耗时</span>
+                                <span class="timing-value">{{ message.sql_generate_time_ms }}ms</span>
+                              </div>
+                              <div class="timing-item">
+                                <span class="timing-label">执行耗时</span>
+                                <span class="timing-value">{{ message.sql_execute_time_ms }}ms</span>
+                              </div>
+                            </div>
+                            
+                            <div class="sql-query-section">
+                              <div class="sql-query-title">生成的 SQL</div>
+                              <div class="sql-query-code">{{ message.sql }}</div>
+                            </div>
+                            
+                            <div v-if="message.data && message.data.length > 0" class="sql-results-section">
+                              <div class="results-title">查询结果 ({{ message.data.length }} 行)</div>
+                              <div class="sql-results-table">
+                                <table>
+                                  <thead>
+                                    <tr>
+                                      <th v-for="(key) in getSqlResultKeys(message.data[0])" :key="key">
+                                        {{ key }}
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <tr v-for="(row, index) in message.data" :key="index">
+                                      <td v-for="(key) in getSqlResultKeys(message.data[0])" :key="key">
+                                        {{ formatSqlCellValue(row[key]) }}
+                                      </td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                            
+                            <div v-else class="sql-empty-result">
+                              暂无查询结果
+                            </div>
+                          </div>
+                          
+                          <div v-else class="sql-result-error">
+                            <div class="error-message">{{ message.error || '查询失败' }}</div>
+                            <div v-if="message.sql" class="error-sql">
+                              <div class="error-sql-title">执行的 SQL</div>
+                              <div class="error-sql-code">{{ message.sql }}</div>
+                            </div>
+                          </div>
+                          
                           <div class="message-time">
                             {{ message.timestamp }}
                           </div>
@@ -474,6 +545,21 @@ const getChartTypeLabel = (chartType) => {
   return labelMap[chartType] || '图表'
 }
 
+const getSqlResultKeys = (row) => {
+  if (!row || typeof row !== 'object') return []
+  return Object.keys(row)
+}
+
+const formatSqlCellValue = (value) => {
+  if (value === null || value === undefined) {
+    return '-'
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  return String(value)
+}
+
 const hexToRgba = (hex, alpha) => {
   const normalizedHex = hex.replace('#', '')
   const value = normalizedHex.length === 3
@@ -537,7 +623,14 @@ const normalizeChartData = (chartType, title, rawData = {}) => {
 }
 
 const createChartMessage = (payload, timestamp, role = 'system_push') => {
-  if (!payload || payload.action !== 'render_chart') {
+  if (!payload) {
+    return null
+  }
+  
+  // 支持两种格式：
+  // 1. 旧的流式格式：{ action: 'render_chart', chart_type: ..., data: ... }
+  // 2. 新的 file_attachments 格式：{ type: 'chart', chart_type: ..., data: ... }
+  if (payload.action !== 'render_chart' && payload.type !== 'chart') {
     return null
   }
 
@@ -679,18 +772,31 @@ const appendChartMessage = (payload, timestamp) => {
 }
 
 const parseFileAttachmentsToMessages = ({
-  fileAttachment,
+  fileAttachments,
   timestamp,
   role = 'tool',
   skipImageUrls = false,
   startId = Date.now()
 }) => {
-  const attachments = Array.isArray(fileAttachment) ? fileAttachment : [fileAttachment]
+  const attachments = Array.isArray(fileAttachments) ? fileAttachments : [fileAttachments]
   const parsedMessages = []
   let messageId = startId
 
   attachments.forEach((attachment) => {
-    if (attachment && typeof attachment === 'object' && !Array.isArray(attachment)) {
+    // 处理 SQL 查询结果
+    if (attachment && typeof attachment === 'object' && attachment.type === 'sql_result') {
+      parsedMessages.push({
+        id: `sql-result-${messageId++}`,
+        type: 'sql_result',
+        role,
+        timestamp,
+        ...attachment
+      })
+      return
+    }
+
+    // 处理图表数据
+    if (attachment && typeof attachment === 'object' && attachment.type === 'chart') {
       const chartMessage = createChartMessage(attachment, timestamp, role)
       if (chartMessage) {
         parsedMessages.push({
@@ -701,25 +807,36 @@ const parseFileAttachmentsToMessages = ({
       return
     }
 
-    if (typeof attachment !== 'string') {
+    // 处理文件 URL（字符串）
+    if (typeof attachment === 'string') {
+      const fileUrl = attachment.trim().replace(/`/g, '')
+      const fileName = fileUrl.split('/').pop() || '文件'
+
+      if (skipImageUrls && isImageFileName(fileName)) {
+        return
+      }
+
+      parsedMessages.push({
+        id: messageId++,
+        type: 'tool',
+        role,
+        fileName,
+        fileUrl,
+        timestamp
+      })
       return
     }
 
-    const fileUrl = attachment.trim().replace(/`/g, '')
-    const fileName = fileUrl.split('/').pop() || '文件'
-
-    if (skipImageUrls && isImageFileName(fileName)) {
-      return
+    // 处理其他类型的对象（向后兼容）
+    if (attachment && typeof attachment === 'object') {
+      const chartMessage = createChartMessage(attachment, timestamp, role)
+      if (chartMessage) {
+        parsedMessages.push({
+          ...chartMessage,
+          id: `chart-${messageId++}`
+        })
+      }
     }
-
-    parsedMessages.push({
-      id: messageId++,
-      type: 'tool',
-      role,
-      fileName,
-      fileUrl,
-      timestamp
-    })
   })
 
   return parsedMessages
@@ -1183,9 +1300,9 @@ const parseNewFormatContent = (msg, baseTimestamp) => {
         // 尝试解析text字段的值
         try {
           const textValue = JSON.parse(item.text)
-          if (textValue && textValue.file_attachment) {
+          if (textValue && textValue.file_attachments) {
             const attachmentMessages = parseFileAttachmentsToMessages({
-              fileAttachment: textValue.file_attachment,
+              fileAttachments: textValue.file_attachments,
               timestamp: baseTimestamp,
               role: msg.role,
               skipImageUrls: true,
@@ -1195,7 +1312,7 @@ const parseNewFormatContent = (msg, baseTimestamp) => {
             parsedMessages.push(...attachmentMessages)
             messageId += attachmentMessages.length
           } else {
-            // 没有file_attachment，作为普通文本（跳过空文本，避免空气泡）
+            // 没有file_attachments，作为普通文本（跳过空文本，避免空气泡）
             if (item.text && item.text.trim()) {
               parsedMessages.push({
                 id: messageId++,
@@ -1318,16 +1435,16 @@ const fetchConversationMessages = async (conversationId) => {
                 console.log('解析历史 tool 消息, content:', msg.content)
                 const contentData = JSON.parse(msg.content)
                 console.log('解析后的 contentData:', contentData)
-                if (contentData.file_attachment) {
+                if (contentData.file_attachments) {
                   const toolMessages = parseFileAttachmentsToMessages({
-                    fileAttachment: contentData.file_attachment,
+                    fileAttachments: contentData.file_attachments,
                     timestamp: baseTimestamp,
                     role: 'tool',
                     startId: Date.now() + index
                   })
                   return toolMessages
                 } else {
-                  console.log('contentData 中没有 file_attachment 字段')
+                  console.log('contentData 中没有 file_attachments 字段')
                   return []
                 }
               } catch (e) {
@@ -1600,16 +1717,16 @@ const handleSendMessage = async () => {
               // 重置hasShownToolCalling，允许后续工具调用再次显示"正在使用工具"提示
               hasShownToolCalling = false
               
-              // 步骤2: 当role为tool且有content时，处理file_attachment
+              // 步骤2: 当role为tool且有content时，处理file_attachments
               if (data.content) {
                 try {
                   console.log('收到 tool 消息, content:', data.content)
                   const contentData = JSON.parse(data.content)
                   console.log('解析后的 contentData:', contentData)
-                  if (contentData.file_attachment) {
+                  if (contentData.file_attachments) {
                     const attachmentTimestamp = new Date().toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
                     const attachmentMessages = parseFileAttachmentsToMessages({
-                      fileAttachment: contentData.file_attachment,
+                      fileAttachments: contentData.file_attachments,
                       timestamp: attachmentTimestamp,
                       role: 'tool',
                       startId: Date.now() + 2
@@ -1619,7 +1736,7 @@ const handleSendMessage = async () => {
                       messages.value = [...messages.value, attachmentMessage]
                     })
                   } else {
-                    console.log('contentData 中没有 file_attachment 字段')
+                    console.log('contentData 中没有 file_attachments 字段')
                   }
                 } catch (e) {
                   console.error('解析 tool 消息内容失败:', e)
@@ -1708,7 +1825,7 @@ const handleSendMessage = async () => {
       }
     }
 
-    messages.value = messages.value.filter(msg => msg.type === 'tool' || msg.type === 'image' || msg.type === 'chart' || (msg.content && msg.content.trim() !== ''))
+    messages.value = messages.value.filter(msg => msg.type === 'tool' || msg.type === 'image' || msg.type === 'chart' || msg.type === 'sql_result' || (msg.content && msg.content.trim() !== ''))
 
     // 检查fullContent是否是新格式JSON，如果是则重新解析
     if (fullContent && fullContent.trim().startsWith('[')) {
@@ -2805,6 +2922,199 @@ $header-h: 56px;
   .chart-canvas-wrapper {
     position: relative;
     height: 320px;
+  }
+
+  .message-time {
+    margin-top: 12px;
+    font-size: 0.75rem;
+    color: #9ca3af;
+  }
+}
+
+.sql-result-message-content {
+  width: min(100%, 780px);
+
+  .sql-result-card {
+    background: #fff;
+    border: 1px solid $border;
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  }
+
+  .sql-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid $border;
+  }
+
+  .sql-result-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: $text;
+  }
+
+  .sql-result-icon {
+    font-size: 1.2rem;
+  }
+
+  .sql-result-badge {
+    flex-shrink: 0;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+
+    &.success {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    &.error {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+  }
+
+  .sql-result-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .sql-timing-info {
+    display: flex;
+    gap: 20px;
+    padding: 12px;
+    background: #f8f9fb;
+    border-radius: 8px;
+  }
+
+  .timing-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .timing-label {
+    font-size: 0.75rem;
+    color: $text-muted;
+    font-weight: 500;
+  }
+
+  .timing-value {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: $primary;
+  }
+
+  .sql-query-section,
+  .sql-results-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sql-query-title,
+  .results-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: $text;
+  }
+
+  .sql-query-code,
+  .error-sql-code {
+    background: #f8f9fb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 0.8rem;
+    font-family: 'Monaco', 'Courier New', monospace;
+    color: $text-muted;
+    max-height: 120px;
+    overflow-y: auto;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+
+  .sql-results-table {
+    overflow-x: auto;
+    border: 1px solid $border;
+    border-radius: 8px;
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+
+      thead {
+        background: #f8f9fb;
+        border-bottom: 1px solid $border;
+      }
+
+      th {
+        padding: 10px 12px;
+        text-align: left;
+        font-weight: 600;
+        color: $text;
+      }
+
+      td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #f3f4f6;
+        color: $text;
+        word-break: break-word;
+        max-width: 200px;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+    }
+  }
+
+  .sql-empty-result {
+    padding: 20px;
+    text-align: center;
+    color: $text-muted;
+    font-size: 0.9rem;
+    background: #f8f9fb;
+    border-radius: 8px;
+  }
+
+  .sql-result-error {
+    padding: 12px;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .error-message {
+    color: #991b1b;
+    font-size: 0.9rem;
+    font-weight: 500;
+  }
+
+  .error-sql {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .error-sql-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: $text-muted;
   }
 
   .message-time {

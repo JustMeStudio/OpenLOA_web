@@ -827,8 +827,31 @@ const parseFileAttachmentsToMessages = ({
       return
     }
 
-    // 处理其他类型的对象（向后兼容）
+    // 处理新的文件对象格式
+    // { type: 'file', file_name: 'report.pdf', ext: 'pdf', url: 'https://...' }
     if (attachment && typeof attachment === 'object') {
+      if (attachment.type === 'file' && typeof attachment.url === 'string') {
+        const fileUrl = attachment.url.trim().replace(/`/g, '')
+        const ext = typeof attachment.ext === 'string' ? attachment.ext.trim() : ''
+        const fallbackName = fileUrl.split('/').pop() || (ext ? `文件.${ext}` : '文件')
+        const fileName = (attachment.file_name || fallbackName).trim()
+
+        if (skipImageUrls && isImageFileName(fileName)) {
+          return
+        }
+
+        parsedMessages.push({
+          id: messageId++,
+          type: 'tool',
+          role,
+          fileName,
+          fileUrl,
+          timestamp
+        })
+        return
+      }
+
+      // 处理其他类型的对象（向后兼容）
       const chartMessage = createChartMessage(attachment, timestamp, role)
       if (chartMessage) {
         parsedMessages.push({

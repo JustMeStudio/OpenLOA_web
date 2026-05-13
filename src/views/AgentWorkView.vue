@@ -178,7 +178,7 @@
                   :key="message.id"
                 >
                   <div 
-                    v-if="message.type === 'user' || message.type === 'tool' || message.type === 'image' || message.type === 'chart' || message.type === 'sql_result' || (message.content && message.content.trim() !== '')"
+                    v-if="message.type === 'user' || message.type === 'tool' || message.type === 'image' || message.type === 'chart' || message.type === 'sql_result' || message.type === 'flight_info_card' || (message.content && message.content.trim() !== '')"
                     class="message-item"
                     :class="[message.type, message.role === 'user' ? 'user' : '']"
                   >
@@ -247,6 +247,52 @@
                           class="message-image"
                           @load="scrollToBottom"
                         />
+                      </div>
+                      <div 
+                        v-else-if="message.type === 'flight_info_card'"
+                        class="flight-message-content"
+                      >
+                        <div class="flight-card" v-for="(flight, index) in message.flights" :key="index">
+                          <div class="flight-card-header">
+                            <span class="flight-no">✈ {{ flight.flight_no }}</span>
+                            <span class="flight-date">| {{ flight.date }}</span>
+                          </div>
+                          
+                          <div class="flight-main-info">
+                            <div class="flight-time-group left">
+                              <div class="flight-time">{{ flight.schedule_arr_time || '--:--' }}</div>
+                              <div class="flight-airport">{{ flight.dep_info }}</div>
+                            </div>
+                            
+                            <div class="flight-route">
+                              <div class="route-line-container">
+                                <span class="route-dot"></span>
+                                <span class="route-plane">✈️</span>
+                                <span class="route-dot"></span>
+                              </div>
+                            </div>
+                            
+                            <div class="flight-time-group right">
+                              <div class="flight-time">{{ flight.schedule_arr_time || '--:--' }}</div>
+                              <div class="flight-airport">{{ flight.arr_info }}</div>
+                            </div>
+                          </div>
+                          
+                          <div class="flight-status-row">
+                            <span class="flight-label">计划</span>
+                            <span class="flight-status" :class="flight.status === '已到达' ? 'arrived' : 'not-arrived'">{{ flight.status }}</span>
+                          </div>
+                          
+                          <div class="flight-history" v-if="flight.history">
+                            <div class="history-timeline"></div>
+                            <div class="history-steps">
+                              <div class="history-step" v-for="(val, key) in flight.history" :key="key" :class="{ 'active': val && val !== '--' }">
+                                <div class="step-label">{{ key }}</div>
+                                <div class="step-time">{{ val || '--' }}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <div 
                         v-else-if="message.type === 'chart'"
@@ -799,11 +845,20 @@ const parseFileAttachmentsToMessages = ({
     if (attachment && typeof attachment === 'object' && attachment.type === 'chart') {
       const chartMessage = createChartMessage(attachment, timestamp, role)
       if (chartMessage) {
-        parsedMessages.push({
-          ...chartMessage,
-          id: `chart-${messageId++}`
-        })
+        parsedMessages.push(chartMessage)
       }
+      return
+    }
+
+    // 处理航班信息卡片
+    if (attachment && typeof attachment === 'object' && attachment.type === 'flight_info_card') {
+      parsedMessages.push({
+        id: `flight-${messageId++}`,
+        type: 'flight_info_card',
+        role,
+        timestamp,
+        ...attachment
+      })
       return
     }
 
@@ -3142,6 +3197,163 @@ $header-h: 56px;
     margin-top: 12px;
     font-size: 0.75rem;
     color: #9ca3af;
+  }
+}
+
+.flight-message-content {
+  width: min(100%, 780px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+
+  .flight-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid #f3f4f6;
+  }
+
+  .flight-card-header {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 16px;
+    
+    .flight-no { color: #dc2626; margin-right: 8px; font-weight: 700; }
+    .flight-date { color: #6b7280; }
+  }
+
+  .flight-main-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 16px;
+  }
+
+  .flight-time-group {
+    text-align: center;
+    
+    &.left { text-align: left; }
+    &.right { text-align: right; }
+
+    .flight-time {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #111827;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .flight-airport {
+      font-size: 0.85rem;
+      color: #6b7280;
+    }
+  }
+
+  .flight-route {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0 20px;
+
+    .route-line-container {
+      width: 100%;
+      height: 2px;
+      background: #e5e7eb;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+
+      .route-dot {
+        width: 4px;
+        height: 4px;
+        background: #d1d5db;
+        border-radius: 50%;
+      }
+      .route-plane {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 1.2rem;
+        color: #9ca3af;
+        background: #fff;
+        padding: 0 4px;
+      }
+    }
+  }
+
+  .flight-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+
+    .flight-label { font-weight: 600; color: #374151; }
+    .flight-status {
+      font-weight: 600;
+      &.arrived { color: #059669; }
+      &.not-arrived { color: #d97706; }
+    }
+  }
+
+  .flight-history {
+    position: relative;
+    padding: 12px;
+    background: #f9fafb;
+    border-radius: 8px;
+    margin-top: 12px;
+
+    .history-timeline {
+      position: absolute;
+      top: 24px;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: #e5e7eb;
+      z-index: 1;
+    }
+
+    .history-steps {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      z-index: 2;
+    }
+
+    .history-step {
+      text-align: center;
+      flex: 1;
+      
+      .step-label {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin-bottom: 12px;
+      }
+      .step-time {
+        font-size: 0.85rem;
+        color: #9ca3af;
+        font-weight: 500;
+        background: #fff;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid #e5e7eb;
+        display: inline-block;
+      }
+      &.active {
+        .step-time {
+          color: #111827;
+          border-color: #d1d5db;
+        }
+      }
+    }
   }
 }
 

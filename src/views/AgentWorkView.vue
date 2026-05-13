@@ -1903,7 +1903,7 @@ const handleSendMessage = async () => {
       }
     }
 
-    messages.value = messages.value.filter(msg => msg.type === 'tool' || msg.type === 'image' || msg.type === 'chart' || msg.type === 'sql_result' || (msg.content && msg.content.trim() !== ''))
+    messages.value = messages.value.filter(msg => msg.type === 'tool' || msg.type === 'image' || msg.type === 'chart' || msg.type === 'sql_result' || msg.type === 'flight_info_card' || (msg.content && msg.content.trim() !== ''))
 
     // 检查fullContent是否是新格式JSON，如果是则重新解析
     if (fullContent && fullContent.trim().startsWith('[')) {

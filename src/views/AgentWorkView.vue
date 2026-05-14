@@ -255,12 +255,13 @@
                         <div class="flight-card" v-for="(flight, index) in message.flights" :key="index">
                           <div class="flight-card-header">
                             <span class="flight-no">✈ {{ flight.flight_no }}</span>
+                            <span class="flight-airline" v-if="flight.airline">{{ flight.airline }}</span>
                             <span class="flight-date">| {{ flight.date }}</span>
                           </div>
                           
                           <div class="flight-main-info">
                             <div class="flight-time-group left">
-                              <div class="flight-time">{{ flight.schedule_arr_time || '--:--' }}</div>
+                              <div class="flight-time">{{ getFlightDepTime(flight) }}</div>
                               <div class="flight-airport">{{ flight.dep_info }}</div>
                             </div>
                             
@@ -279,16 +280,19 @@
                           </div>
                           
                           <div class="flight-status-row">
-                            <span class="flight-label">计划</span>
-                            <span class="flight-status" :class="flight.status === '已到达' ? 'arrived' : 'not-arrived'">{{ flight.status }}</span>
+                            <span class="flight-label">状态</span>
+                            <div>
+                              <span class="flight-status" :class="flight.status === '已到达' ? 'arrived' : 'not-arrived'" style="margin-right: 8px;">{{ flight.status }}</span>
+                              <span class="flight-dynamics" v-if="flight.flight_dynamics" v-html="flight.flight_dynamics"></span>
+                            </div>
                           </div>
                           
-                          <div class="flight-history" v-if="flight.history">
+                          <div class="flight-history" v-if="flight.history && flight.history.length > 0">
                             <div class="history-timeline"></div>
                             <div class="history-steps">
-                              <div class="history-step" v-for="(val, key) in flight.history" :key="key" :class="{ 'active': val && val !== '--' }">
-                                <div class="step-label">{{ key }}</div>
-                                <div class="step-time">{{ val || '--' }}</div>
+                              <div class="history-step" v-for="(item, i) in flight.history" :key="i" :class="{ 'highlight-step': item.is_highlight }">
+                                <div class="step-label">{{ item.status_name }}</div>
+                                <div class="step-time">{{ item.time || '--' }}</div>
                               </div>
                             </div>
                           </div>
@@ -852,12 +856,26 @@ const parseFileAttachmentsToMessages = ({
 
     // 处理航班信息卡片
     if (attachment && typeof attachment === 'object' && attachment.type === 'flight_info_card') {
+      // flights 字段可能是 JSON 字符串，需要解析成数组
+      let flights = attachment.flights
+      if (typeof flights === 'string') {
+        try {
+          flights = JSON.parse(flights.trim())
+        } catch (e) {
+          console.error('解析 flights JSON 字符串失败:', e)
+          flights = []
+        }
+      }
+      if (!Array.isArray(flights)) {
+        flights = []
+      }
       parsedMessages.push({
+        ...attachment,
+        flights,
         id: `flight-${messageId++}`,
         type: 'flight_info_card',
         role,
-        timestamp,
-        ...attachment
+        timestamp
       })
       return
     }
@@ -1324,6 +1342,13 @@ const parseMessageContent = (content) => {
 const formatTime = (timeStr) => {
   if (!timeStr) return ''
   return timeStr.replace('T', ' ').split('.')[0]
+}
+
+// 从航班 history 中提取计划起飞时间
+const getFlightDepTime = (flight) => {
+  if (!Array.isArray(flight.history)) return '--:--'
+  const item = flight.history.find(h => h.status_name && h.status_name.includes('起飞'))
+  return item?.time || '--:--'
 }
 
 const scrollToBottom = () => {
@@ -2249,7 +2274,7 @@ onMounted(async () => {
       agentNickName.value = agentData.nick_name || name
       agentAvatar.value = agentData.avatar || ''
       agentDescription.value = agentData.description || '我是你的AI助手，有什么可以帮到你的？'
-      starterPrompts.value = Array.isArray(agentData.starter_prompts) ? agentData.starter_prompts : []
+      starterPrompts.value = agentData.starter_prompts?.default || (Array.isArray(agentData.starter_prompts) ? agentData.starter_prompts : [])
       
       console.log('[DEBUG] Final starter prompts set to:', starterPrompts.value)
     } else {
@@ -3223,6 +3248,15 @@ $header-h: 56px;
     margin-bottom: 16px;
     
     .flight-no { color: #dc2626; margin-right: 8px; font-weight: 700; }
+    .flight-airline {
+      font-size: 0.78rem;
+      color: #fff;
+      background: #6366f1;
+      border-radius: 4px;
+      padding: 1px 7px;
+      margin-right: 8px;
+      font-weight: 500;
+    }
     .flight-date { color: #6b7280; }
   }
 
@@ -3353,9 +3387,22 @@ $header-h: 56px;
           border-color: #d1d5db;
         }
       }
+      &.highlight-step {
+        .step-time {
+          color: #059669;
+          border-color: #34d399;
+          background: #ecfdf5;
+          font-weight: 600;
+        }
+        .step-label {
+          color: #059669;
+          font-weight: 500;
+        }
+      }
     }
   }
 }
+
 
 .tool-calling-message {
   .tool-calling-content {
